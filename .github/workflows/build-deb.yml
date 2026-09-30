@@ -1,0 +1,143 @@
+name: Build .deb
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev imagemagick
+          pip install Pillow
+
+      - name: Generate icons
+        run: |
+          if [ -f crea_icona.py ]; then
+            python3 crea_icona.py
+          fi
+          ls -la icona*.png || true
+
+      - name: Detect version
+        id: version
+        run: |
+          VERSION=$(grep '^APP_VERSION' usr/share/pulizia-ubuntu/pulizia_gui.py | cut -d'"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Versione rilevata: $VERSION"
+
+      - name: Build .deb
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NAME="pulizia-ubuntu"
+          BUILD="build-$NAME"
+
+          rm -rf "$BUILD"
+          mkdir -p "$BUILD/DEBIAN"
+          mkdir -p "$BUILD/usr/bin"
+          mkdir -p "$BUILD/usr/share/pulizia-ubuntu"
+          mkdir -p "$BUILD/usr/share/applications"
+          mkdir -p "$BUILD/usr/share/icons/hicolor"/{16x16,32x32,48x48,64x64,128x128,256x256}/apps
+          mkdir -p "$BUILD/usr/share/doc/$NAME"
+
+          cp usr/share/pulizia-ubuntu/pulizia_gui.py "$BUILD/usr/share/pulizia-ubuntu/"
+          chmod 644 "$BUILD/usr/share/pulizia-ubuntu/pulizia_gui.py"
+          cp icona.png "$BUILD/usr/share/pulizia-ubuntu/" 2>/dev/null || true
+
+          for size in 16 32 48 64 128 256; do
+            if [ -f "icona_${size}.png" ]; then
+              cp "icona_${size}.png" "$BUILD/usr/share/icons/hicolor/${size}x${size}/apps/$NAME.png"
+            fi
+          done
+
+          cat > "$BUILD/usr/bin/$NAME" << 'EOF'
+          #!/bin/bash
+          exec python3 /usr/share/pulizia-ubuntu/pulizia_gui.py "$@"
+          EOF
+          chmod 755 "$BUILD/usr/bin/$NAME"
+
+          cat > "$BUILD/usr/share/applications/$NAME.desktop" << 'EOF'
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Pulizia Ubuntu
+          Name[en]=Ubuntu Cleanup
+          Comment=Pulisci e mantieni veloce il sistema Ubuntu
+          Comment[en]=Clean and keep your Ubuntu system fast
+          Exec=/usr/bin/pulizia-ubuntu
+          Icon=pulizia-ubuntu
+          Terminal=false
+          Categories=Utility;
+          Keywords=clean;pulizia;ubuntu;
+          StartupNotify=true
+          EOF
+
+          cat > "$BUILD/DEBIAN/control" << EOF
+          Package: $NAME
+          Version: $VERSION
+          Section: utils
+          Priority: optional
+          Architecture: all
+          Depends: python3, python3-tk, python3-pil, python3-matplotlib, libnotify-bin
+          Recommends: cron, deborphan
+          Maintainer: coding4u-it <coding4u-it@users.noreply.github.com>
+          Description: Applicazione grafica per la pulizia di Ubuntu
+           Utility con interfaccia grafica per eseguire operazioni
+           di manutenzione su Ubuntu (13 operazioni disponibili).
+          EOF
+          chmod 644 "$BUILD/DEBIAN/control"
+
+          cat > "$BUILD/DEBIAN/postinst" << 'EOF'
+          #!/bin/bash
+          set -e
+          if [ -x /usr/bin/gtk-update-icon-cache ]; then
+              gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+          fi
+          if [ -x /usr/bin/update-desktop-database ]; then
+              update-desktop-database -q /usr/share/applications 2>/dev/null || true
+          fi
+          exit 0
+          EOF
+          chmod 755 "$BUILD/DEBIAN/postinst"
+
+          cat > "$BUILD/DEBIAN/prerm" << 'EOF'
+          #!/bin/bash
+          set -e
+          rm -f /etc/cron.d/pulizia-ubuntu 2>/dev/null || true
+          rm -f /usr/local/bin/pulizia_ubuntu_cron.sh 2>/dev/null || true
+          exit 0
+          EOF
+          chmod 755 "$BUILD/DEBIAN/prerm"
+
+          dpkg-deb --root-owner-group --build "$BUILD" "${NAME}-${VERSION}.deb"
+          ls -la "${NAME}-${VERSION}.deb"
+
+      - name: Upload .deb as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulizia-ubuntu-deb
+          path: pulizia-ubuntu-*.deb
+
+      - name: Upload .deb to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: pulizia-ubuntu-*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
