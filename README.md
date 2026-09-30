@@ -1,7 +1,7 @@
 # 🧹 Pulizia Ubuntu
 
 <div align="center">
-
+![Anteprima](https://raw.githubusercontent.com/coding4u-it/pulizia-ubuntu/main/screenshot.png)
 ![Version](https://img.shields.io/badge/version-2.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Ubuntu-orange)
