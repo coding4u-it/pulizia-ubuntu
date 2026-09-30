@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Pulizia Ubuntu
+Comment=Pulisci il sistema Ubuntu
+Exec=pulizia-ubuntu
+Icon=pulizia-ubuntu
+Terminal=false
+Categories=System;Utility;
+Keywords=clean;pulizia;ubuntu;manutenzione;
+StartupNotify=true

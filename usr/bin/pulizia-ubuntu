@@ -1,0 +1,3 @@
+#!/bin/bash
+# Wrapper per avviare l'applicazione con sudo già autenticato
+exec python3 /usr/share/pulizia-ubuntu/pulizia_gui.py "$@"

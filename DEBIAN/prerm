@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+# Rimuove la schedulazione cron se presente
+rm -f /etc/cron.d/pulizia-ubuntu 2>/dev/null || true
+rm -f /usr/local/bin/pulizia_ubuntu_cron.sh 2>/dev/null || true
+
+exit 0

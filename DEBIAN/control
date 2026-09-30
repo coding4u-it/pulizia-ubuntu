@@ -1,0 +1,11 @@
+Package: pulizia-ubuntu
+Version: 1.1
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3, python3-tk, python3-pil
+Maintainer: Il Tuo Nome <tua@email.com>
+Description: Applicazione grafica per la pulizia di Ubuntu
+ Utility con interfaccia grafica per eseguire operazioni
+ di manutenzione e pulizia del sistema Ubuntu 26.04 LTS.
+ Include pulizia APT, Snap, log, cache browser e schedulazione cron.
