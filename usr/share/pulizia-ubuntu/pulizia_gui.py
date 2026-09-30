@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Pulizia Ubuntu v2.3 - i18n, icona, grafico, notifiche, cron, guida,
-browser selezionabili, cestino, kernel, analisi disco."""
+"""Pulizia Ubuntu v2.4 - Pulizia APT avanzata."""
 
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
@@ -9,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "2.3"
+APP_VERSION = "2.4"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 
 TRANSLATIONS = {
@@ -22,6 +21,9 @@ TRANSLATIONS = {
         "opt_tmp": "Pulizia file temporanei (/tmp, /var/tmp)",
         "opt_thumb": "Pulizia anteprime (thumbnails)",
         "opt_trash": "Svuotamento cestino",
+        "opt_apt_purge": "Pulizia config orfane (apt purge rc)",
+        "opt_apt_deborphan": "Rimozione librerie orfane (deborphan)",
+        "opt_apt_lists": "Rigenerazione liste APT (/var/lib/apt/lists)",
         "opt_kernels": "Rimozione vecchi kernel (⚠️ pericoloso)",
         "btn_run": "▶  Esegui Pulizia",
         "btn_schedule": "⏱  Schedula",
@@ -73,7 +75,10 @@ TRANSLATIONS = {
         "step_browser": "[7] Pulizia cache browser...",
         "step_thumb": "[8] Pulizia anteprime...",
         "step_trash": "[9] Svuotamento cestino...",
-        "step_kernels": "[10] Rimozione vecchi kernel...",
+        "step_apt_purge": "[10] Pulizia config orfane (rc)...",
+        "step_apt_deborphan": "[11] Rimozione librerie orfane...",
+        "step_apt_lists": "[12] Rigenerazione liste APT...",
+        "step_kernels": "[13] Rimozione vecchi kernel...",
         "ok": "✅ OK",
         "snap_none": "ℹ️  Snap non installato",
         "snap_no_rev": "✅ Nessuna revisione da rimuovere",
@@ -84,6 +89,15 @@ TRANSLATIONS = {
         "thumb_ok": "✅ Anteprime rimosse",
         "trash_ok": "✅ Cestino svuotato",
         "trash_empty": "ℹ️  Cestino già vuoto",
+        "apt_purge_none": "ℹ️  Nessuna config orfana trovata",
+        "apt_purge_found": "Trovate {0} config orfane",
+        "apt_purge_remove": "Rimozione {0}...",
+        "apt_purge_done": "✅ {0} pacchetti purgati",
+        "apt_lists_ok": "✅ Liste APT rigenerate",
+        "apt_lists_err": "⚠️  Errore rigenerazione liste",
+        "deborphan_none": "ℹ️  deborphan non installato, salto",
+        "deborphan_ok": "✅ Librerie orfane rimosse",
+        "deborphan_found": "Trovate {0} librerie orfane",
         "kernels_current": "Kernel attuale: {0}",
         "kernels_found": "Trovati {0} kernel installati",
         "kernels_remove": "Rimozione {0}...",
@@ -112,7 +126,7 @@ TRANSLATIONS = {
         "sched_thu": "Giovedì",
         "sched_fri": "Venerdì",
         "sched_sat": "Sabato",
-        "sched_note": "⚠️  La schedulazione richiede la password sudo.\nLo script verrà installato in:\n  /usr/local/bin/pulizia_ubuntu_cron.sh",
+        "sched_note": "⚠️  La schedulazione richiede la password sudo.",
         "sched_save": "💾 Salva",
         "sched_remove": "🗑  Rimuovi",
         "sched_close": "Chiudi",
@@ -145,8 +159,6 @@ TRANSLATIONS = {
         "disk_total": "TOTALE",
         "disk_close": "Chiudi",
         "disk_done": "Analisi completata. Directory più grandi in cima.",
-        "kernels_confirm_title": "⚠️  Rimozione kernel",
-        "kernels_confirm_msg": "Verranno rimossi i kernel vecchi mantenendo solo\nquello attuale e il più recente.\n\nContinuare?",
     },
     "en": {
         "app_title": "🧹 System Cleanup",
@@ -157,6 +169,9 @@ TRANSLATIONS = {
         "opt_tmp": "Temporary files cleanup (/tmp, /var/tmp)",
         "opt_thumb": "Thumbnails cleanup",
         "opt_trash": "Empty trash",
+        "opt_apt_purge": "Orphan config cleanup (apt purge rc)",
+        "opt_apt_deborphan": "Remove orphan libraries (deborphan)",
+        "opt_apt_lists": "Regenerate APT lists (/var/lib/apt/lists)",
         "opt_kernels": "Remove old kernels (⚠️ dangerous)",
         "btn_run": "▶  Run Cleanup",
         "btn_schedule": "⏱  Schedule",
@@ -208,7 +223,10 @@ TRANSLATIONS = {
         "step_browser": "[7] Cleaning browser caches...",
         "step_thumb": "[8] Cleaning thumbnails...",
         "step_trash": "[9] Emptying trash...",
-        "step_kernels": "[10] Removing old kernels...",
+        "step_apt_purge": "[10] Cleaning orphan configs (rc)...",
+        "step_apt_deborphan": "[11] Removing orphan libraries...",
+        "step_apt_lists": "[12] Regenerating APT lists...",
+        "step_kernels": "[13] Removing old kernels...",
         "ok": "✅ OK",
         "snap_none": "ℹ️  Snap not installed",
         "snap_no_rev": "✅ No revisions to remove",
@@ -219,6 +237,15 @@ TRANSLATIONS = {
         "thumb_ok": "✅ Thumbnails removed",
         "trash_ok": "✅ Trash emptied",
         "trash_empty": "ℹ️  Trash already empty",
+        "apt_purge_none": "ℹ️  No orphan configs found",
+        "apt_purge_found": "Found {0} orphan configs",
+        "apt_purge_remove": "Removing {0}...",
+        "apt_purge_done": "✅ {0} packages purged",
+        "apt_lists_ok": "✅ APT lists regenerated",
+        "apt_lists_err": "⚠️  Error regenerating lists",
+        "deborphan_none": "ℹ️  deborphan not installed, skipping",
+        "deborphan_ok": "✅ Orphan libraries removed",
+        "deborphan_found": "Found {0} orphan libraries",
         "kernels_current": "Current kernel: {0}",
         "kernels_found": "Found {0} installed kernels",
         "kernels_remove": "Removing {0}...",
@@ -247,7 +274,7 @@ TRANSLATIONS = {
         "sched_thu": "Thursday",
         "sched_fri": "Friday",
         "sched_sat": "Saturday",
-        "sched_note": "⚠️  Scheduling requires sudo password.\nScript will be installed at:\n  /usr/local/bin/pulizia_ubuntu_cron.sh",
+        "sched_note": "⚠️  Scheduling requires sudo password.",
         "sched_save": "💾 Save",
         "sched_remove": "🗑  Remove",
         "sched_close": "Close",
@@ -280,8 +307,6 @@ TRANSLATIONS = {
         "disk_total": "TOTAL",
         "disk_close": "Close",
         "disk_done": "Analysis complete. Largest directories on top.",
-        "kernels_confirm_title": "⚠️  Kernel removal",
-        "kernels_confirm_msg": "Old kernels will be removed, keeping only\nthe current and the most recent one.\n\nContinue?",
     },
 }
 
@@ -297,198 +322,151 @@ pacchetti non più necessari.
 Ogni operazione viene eseguita in modo sicuro: l'app
 usa solo comandi standard di Ubuntu e mostra sempre
 un report dettagliato di ciò che è stato fatto."""),
-        ("Esegui Pulizia", """Clicca il pulsante "Esegui Pulizia" per avviare la
+        ("Esegui Pulizia", """Clicca "Esegui Pulizia" per avviare la
 manutenzione del sistema.
 
-L'app ti chiederà la password di amministratore (sudo)
-perché alcune operazioni richiedono privilegi di root.
+L'app ti chiederà la password di amministratore (sudo).
 
-Una volta inserita la password, la pulizia partirà
-automaticamente e vedrai:
-
-  • Il report aggiornarsi in tempo reale
-  • La barra di progresso avanzare
-  • Una notifica desktop al termine
-  • Un grafico con lo spazio liberato
-
-Al termine puoi salvare o copiare il report."""),
-        ("Opzioni di pulizia", """Puoi scegliere quali operazioni eseguire tramite le
-caselle di controllo:
+Al termine vedrai:
+  • Report in tempo reale
+  • Barra di progresso
+  • Notifica desktop
+  • Grafico spazio liberato"""),
+        ("Opzioni di pulizia", """Scegli quali operazioni eseguire:
 
 ✓ Pulizia cache browser (Chrome, Chromium, Edge,
-  Firefox, Brave, Opera). Non tocca segnalibri
-  o password.
-
+  Firefox, Brave, Opera)
 ✓ Rimozione vecchie revisioni Snap
 ✓ Pulizia file temporanei
 ✓ Pulizia anteprime
 ✓ Svuotamento cestino
-✓ Rimozione vecchi kernel (⚠️ pericoloso)
+✓ Pulizia config orfane (apt purge rc)
+✓ Rimozione librerie orfane (deborphan)
+✓ Rigenerazione liste APT
+✓ Rimozione vecchi kernel
 
 Sempre attive:
   • Pulizia pacchetti orfani (apt autoremove)
   • Pulizia cache APT
-  • Pulizia log di systemd (mantiene ultimi 3 giorni)"""),
-        ("Report", """Ogni operazione viene registrata in un report
-dettagliato visibile in fondo alla finestra.
+  • Pulizia log systemd (mantiene ultimi 3 giorni)"""),
+        ("Pulizia APT avanzata", """Pulizia config orfane (rc):
+  Rimuove i file di configurazione di pacchetti
+  già disinstallati. Sicuro, libera sempre MB.
 
-📋 Copia
-  Copia tutto il report negli appunti.
+Rimozione librerie orfane (deborphan):
+  Trova librerie non più usate da nessun pacchetto.
+  Richiede deborphan installato:
+    sudo apt install deborphan
 
-💾 Salva
-  Salva il report in un file di testo con data e ora
-  nel nome (es. report_pulizia_20260930_143045.txt)."""),
-        ("Schedulazione", """Puoi programmare la pulizia automatica aprendo la
-finestra "⏱ Schedula".
+Rigenerazione liste APT:
+  Elimina e riscarica /var/lib/apt/lists.
+  Utile se hai errori "404 Not Found".
+  Richiede connessione internet."""),
+        ("Report", """Ogni operazione è registrata nel report.
 
-SEZIONE 1 - Stato del servizio cron
-  Mostra se cron è attivo e se esiste già una
-  schedulazione. Puoi abilitare/disabilitare cron.
+📋 Copia: copia il report negli appunti
+💾 Salva: salva in file .txt con data/ora"""),
+        ("Schedulazione", """Programma la pulizia automatica via cron.
 
-SEZIONE 2 - Configurazione
-  Frequenza: ogni giorno, settimana o mese
-  Ora: da 0 a 23
-  Giorno: solo per settimanale
-
-Salvando, l'app installa:
-  • /usr/local/bin/pulizia_ubuntu_cron.sh
-  • /etc/cron.d/pulizia-ubuntu
-
-Log in /var/log/pulizia_ubuntu.log"""),
+Il log è in /var/log/pulizia_ubuntu.log"""),
         ("Notifiche", """Al termine di ogni pulizia ricevi una notifica
-desktop in alto a destra.
-
-Funziona sia per pulizia manuale sia per cron.
+desktop.
 
 Se non vedi le notifiche:
   sudo apt install libnotify-bin"""),
-        ("Lingua", """L'app supporta Italiano e Inglese.
+        ("Lingua", """Supporta Italiano e Inglese.
 
-Usa il menu a tendina in alto a destra per cambiare
-lingua in qualsiasi momento.
+Usa il menu in alto a destra per cambiare lingua."""),
+        ("Analisi disco", """Il pulsante "📊 Analisi disco" mostra le directory
+più grandi del sistema.
 
-La lingua viene anche rilevata dall'ambiente di
-sistema (variabile LANG)."""),
-        ("Analisi disco", """Il pulsante "📊 Analisi disco" apre una finestra
-che mostra le directory più grandi del sistema.
-
-Vengono analizzate:
-  • /var/log, /var/cache, /var/lib/snapd
-  • /usr/lib, /usr/share
-  • ~/.cache, ~/.local/share/Trash
-  • Browser (Chrome, Firefox, Brave)
-  • E altre...
-
-È solo lettura: non cancella nulla."""),
+Solo lettura: non cancella nulla."""),
         ("Domande frequenti", """D: Serve sudo?
-R: Sì, per apt, journalctl, snap, cron.
+R: Sì, per apt, journalctl, snap.
 
-D: La cache del browser cancella le password?
+D: La cache browser cancella le password?
 R: No. Solo cache temporanea.
 
-D: Dove trovo il log dell'app?
+D: Dove trovo il log?
 R: /tmp/pulizia_ubuntu_debug.log
 
-D: Come disinstallo tutto?
-R: sudo dpkg -r pulizia-ubuntu
-   sudo rm -rf /usr/share/pulizia-ubuntu
-   sudo rm -f /etc/cron.d/pulizia-ubuntu"""),
+D: Come disinstallo?
+R: sudo dpkg --purge pulizia-ubuntu"""),
     ],
     "en": [
         ("Introduction", """Welcome to Ubuntu Cleanup!
 
-This app helps you keep your system clean and fast
-by removing temporary files, caches and unnecessary
+This app helps keep your system clean and fast by
+removing temporary files, caches and unnecessary
 packages.
 
-Every operation is safe: the app uses only standard
-Ubuntu commands and always shows a detailed report."""),
+Every operation is safe: uses only standard Ubuntu
+commands and shows a detailed report."""),
         ("Run Cleanup", """Click "Run Cleanup" to start maintenance.
 
-The app will ask for your sudo password because some
-operations require root privileges.
+The app asks for sudo password.
 
-You will see:
-
-  • Report updating in real time
+At the end you'll see:
+  • Real-time report
   • Progress bar
-  • Desktop notification when done
-  • Chart with freed space"""),
-        ("Cleanup Options", """Choose which operations to run:
+  • Desktop notification
+  • Freed space chart"""),
+        ("Cleanup Options", """Choose operations:
 
-✓ Browser cache cleanup (Chrome, Chromium, Edge,
-  Firefox, Brave, Opera). Doesn't touch bookmarks
-  or passwords.
-
+✓ Browser cache (Chrome, Chromium, Edge, Firefox,
+  Brave, Opera)
 ✓ Remove old Snap revisions
 ✓ Temporary files cleanup
 ✓ Thumbnails cleanup
 ✓ Empty trash
-✓ Remove old kernels (⚠️ dangerous)
+✓ Orphan config cleanup (apt purge rc)
+✓ Remove orphan libraries (deborphan)
+✓ Regenerate APT lists
+✓ Remove old kernels
 
 Always active:
   • Orphan packages (apt autoremove)
   • APT cache
-  • systemd logs (keeps last 3 days)"""),
-        ("Report", """Every operation is logged in a detailed report.
+  • systemd logs (last 3 days)"""),
+        ("Advanced APT cleanup", """Orphan config cleanup (rc):
+  Removes config files of uninstalled packages.
+  Safe, frees some MB.
 
-📋 Copy
-  Copies report to clipboard.
+Orphan libraries (deborphan):
+  Finds libraries no longer used. Requires:
+    sudo apt install deborphan
 
-💾 Save
-  Saves report with date/time in filename."""),
-        ("Scheduling", """Open the "⏱ Schedule" window.
+Regenerate APT lists:
+  Deletes and re-downloads /var/lib/apt/lists.
+  Useful for "404 Not Found" errors."""),
+        ("Report", """Every operation is logged.
 
-SECTION 1 - Cron service status
-  Shows if cron is active and if a schedule exists.
+📋 Copy: to clipboard
+💾 Save: to .txt file"""),
+        ("Scheduling", """Schedule automatic cleanup via cron.
 
-SECTION 2 - Configuration
-  Frequency: daily, weekly, monthly
-  Hour: 0-23
-  Day: weekly only
-
-Saves:
-  • /usr/local/bin/pulizia_ubuntu_cron.sh
-  • /etc/cron.d/pulizia-ubuntu
-
-Log at /var/log/pulizia_ubuntu.log"""),
-        ("Notifications", """At the end of every cleanup you get a desktop
-notification in the top right corner.
-
-Works for both manual and cron cleanup.
+Log in /var/log/pulizia_ubuntu.log"""),
+        ("Notifications", """Desktop notification at end of cleanup.
 
 If missing:
   sudo apt install libnotify-bin"""),
         ("Language", """Supports Italian and English.
 
-Use the dropdown at the top right to switch language
-at any time.
-
-Auto-detected from LANG variable."""),
-        ("Disk analysis", """The "📊 Disk analysis" button opens a window with
-the largest directories.
-
-Analyzed:
-  • /var/log, /var/cache, /var/lib/snapd
-  • /usr/lib, /usr/share
-  • ~/.cache, ~/.local/share/Trash
-  • Browsers
-  • And more...
+Use dropdown at top right."""),
+        ("Disk analysis", """Click "📊 Disk analysis" to see largest directories.
 
 Read-only: nothing is deleted."""),
         ("FAQ", """Q: Is sudo required?
-A: Yes, for apt, journalctl, snap, cron.
+A: Yes, for apt, journalctl, snap.
 
 Q: Does browser cleanup remove passwords?
-A: No. Only temporary cache.
+A: No. Only cache.
 
-Q: Where's the app log?
+Q: Where's the log?
 A: /tmp/pulizia_ubuntu_debug.log
 
 Q: How to uninstall?
-A: sudo dpkg -r pulizia-ubuntu
-   sudo rm -rf /usr/share/pulizia-ubuntu
-   sudo rm -f /etc/cron.d/pulizia-ubuntu"""),
+A: sudo dpkg --purge pulizia-ubuntu"""),
     ],
 }
 
@@ -528,8 +506,8 @@ class PuliziaApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"{APP_NAME} {APP_VERSION}")
-        self.root.geometry("820x760+80+40")
-        self.root.minsize(760, 640)
+        self.root.geometry("820x780+80+40")
+        self.root.minsize(760, 660)
         self.root.configure(bg="#2c3e50")
 
         self.report_lines = []
@@ -540,7 +518,7 @@ class PuliziaApp:
         self.password_sudo = None
         self.ui_queue = queue.Queue()
 
-        # Variabili
+        # Browser
         self.var_browser_all = tk.BooleanVar(value=True)
         self.var_chrome = tk.BooleanVar(value=True)
         self.var_chromium = tk.BooleanVar(value=True)
@@ -548,15 +526,19 @@ class PuliziaApp:
         self.var_firefox = tk.BooleanVar(value=True)
         self.var_brave = tk.BooleanVar(value=True)
         self.var_opera = tk.BooleanVar(value=True)
+
+        # Altre opzioni
         self.var_snap = tk.BooleanVar(value=True)
         self.var_tmp = tk.BooleanVar(value=True)
         self.var_thumbnails = tk.BooleanVar(value=True)
         self.var_trash = tk.BooleanVar(value=True)
+        self.var_apt_purge = tk.BooleanVar(value=True)
+        self.var_apt_deborphan = tk.BooleanVar(value=False)
+        self.var_apt_lists = tk.BooleanVar(value=False)
         self.var_kernels = tk.BooleanVar(value=False)
 
         debug_log("=" * 50)
         debug_log(f"=== App avviata - {APP_NAME} {APP_VERSION} ===")
-        debug_log(f"Lingua: {CURRENT_LANG}")
 
         self._set_icona()
         self._build_ui()
@@ -591,7 +573,6 @@ class PuliziaApp:
                     continue
 
     def _build_ui(self):
-        # Header
         header = tk.Frame(self.root, bg="#2c3e50")
         header.pack(fill=tk.X, pady=(10, 0))
 
@@ -616,7 +597,6 @@ class PuliziaApp:
             bg="#2c3e50", fg="#95a5a6")
         self.lbl_sottotitolo.pack(pady=(2, 6))
 
-        # Opzioni
         self.frame_opt = tk.LabelFrame(
             self.root, text=_("options_title"),
             font=("Ubuntu", 10, "bold"),
@@ -638,7 +618,6 @@ class PuliziaApp:
         cb_all.pack(fill=tk.X)
         self.checkbuttons["opt_browser"] = cb_all
 
-        # Browser individuali
         frame_sub = tk.Frame(self.frame_opt, bg="#34495e")
         frame_sub.pack(fill=tk.X, padx=10, pady=(0, 4))
         self.browser_vars = {
@@ -659,11 +638,13 @@ class PuliziaApp:
                 anchor="w", command=self._sync_master_browser)
             cb.grid(row=r, column=c, sticky="w", padx=15, pady=1)
 
-        # Altre opzioni
         for key, var in [("opt_snap", self.var_snap),
                          ("opt_tmp", self.var_tmp),
                          ("opt_thumb", self.var_thumbnails),
                          ("opt_trash", self.var_trash),
+                         ("opt_apt_purge", self.var_apt_purge),
+                         ("opt_apt_deborphan", self.var_apt_deborphan),
+                         ("opt_apt_lists", self.var_apt_lists),
                          ("opt_kernels", self.var_kernels)]:
             cb = tk.Checkbutton(self.frame_opt, text=_(key), variable=var,
                                 font=("Ubuntu", 10),
@@ -682,7 +663,6 @@ class PuliziaApp:
                                               "#27ae60", "#2ecc71",
                                               self.avvia_pulizia, 18)
         self.btn_esegui.pack(side=tk.LEFT, padx=4)
-
         self.btn_schedula = self._crea_pulsante(frame_btn, _("btn_schedule"),
                                                 "#2980b9", "#3498db",
                                                 self.apri_schedulazione, 12)
@@ -703,7 +683,6 @@ class PuliziaApp:
                                             self.esci, 8)
         self.btn_esci.pack(side=tk.LEFT, padx=4)
 
-        # Progress
         self.progress = ttk.Progressbar(self.root, orient="horizontal",
                                         length=740, mode="determinate")
         self.progress.pack(pady=6, padx=20, fill=tk.X)
@@ -713,7 +692,6 @@ class PuliziaApp:
                                   bg="#2c3e50", fg="#f39c12")
         self.lbl_stato.pack(pady=4)
 
-        # Report header
         frame_head = tk.Frame(self.root, bg="#2c3e50")
         frame_head.pack(fill=tk.X, padx=20, pady=(6, 0))
 
@@ -735,7 +713,7 @@ class PuliziaApp:
         self.btn_copia.pack(side=tk.RIGHT, padx=4)
 
         self.txt_report = scrolledtext.ScrolledText(
-            self.root, wrap=tk.WORD, width=90, height=13,
+            self.root, wrap=tk.WORD, width=90, height=12,
             font=("Ubuntu Mono", 9), bg="#1c2833", fg="#ecf0f1",
             insertbackground="white", relief="flat", state=tk.DISABLED)
         self.txt_report.pack(padx=20, pady=(5, 12), fill=tk.BOTH, expand=True)
@@ -1061,6 +1039,12 @@ class PuliziaApp:
                 passi.append((_("step_thumb"), "THUMB"))
             if self.var_trash.get():
                 passi.append((_("step_trash"), "TRASH"))
+            if self.var_apt_purge.get():
+                passi.append((_("step_apt_purge"), "APT_PURGE"))
+            if self.var_apt_deborphan.get():
+                passi.append((_("step_apt_deborphan"), "DEBORPHAN"))
+            if self.var_apt_lists.get():
+                passi.append((_("step_apt_lists"), "APT_LISTS"))
             if self.var_kernels.get():
                 passi.append((_("step_kernels"), "KERNELS"))
 
@@ -1081,6 +1065,12 @@ class PuliziaApp:
                     self._pulisci_thumbnails()
                 elif cmd == "TRASH":
                     self._svuota_cestino()
+                elif cmd == "APT_PURGE":
+                    self._pulisci_apt_purge()
+                elif cmd == "DEBORPHAN":
+                    self._pulisci_deborphan()
+                elif cmd == "APT_LISTS":
+                    self._pulisci_apt_lists()
                 elif cmd == "KERNELS":
                     self._gestisci_kernel()
                 else:
@@ -1288,6 +1278,62 @@ class PuliziaApp:
         else:
             self._log(f"   {_('trash_empty')}")
 
+    def _pulisci_apt_purge(self):
+        r = subprocess.run("dpkg -l | awk '/^rc/{print $2}'",
+                           shell=True, capture_output=True,
+                           text=True, timeout=15)
+        pacchetti = [p.strip() for p in (r.stdout or "").split("\n") if p.strip()]
+        if not pacchetti:
+            self._log(f"   {_('apt_purge_none')}")
+            return
+        self._log(f"   {_('apt_purge_found', len(pacchetti))}")
+        batch_size = 50
+        for i in range(0, len(pacchetti), batch_size):
+            batch = pacchetti[i:i + batch_size]
+            self._log(f"   {_('apt_purge_remove', ' '.join(batch[:3]))}"
+                      + ("..." if len(batch) > 3 else ""))
+            cmd = "sudo apt-get purge -y " + " ".join(batch)
+            ok, out = self._esegui_comando(cmd, timeout=600)
+            if ok:
+                self._log(f"      {_('apt_purge_done', len(batch))}")
+            else:
+                self._log(f"      ⚠️  {out[:200]}")
+
+    def _pulisci_deborphan(self):
+        if not shutil.which("deborphan"):
+            self._log(f"   {_('deborphan_none')}")
+            return
+        r = subprocess.run("deborphan", shell=True,
+                           capture_output=True, text=True, timeout=30)
+        librerie = [l.strip() for l in (r.stdout or "").split("\n") if l.strip()]
+        if not librerie:
+            self._log(f"   {_('deborphan_ok')}")
+            return
+        self._log(f"   {_('deborphan_found', len(librerie))}")
+        batch_size = 30
+        for i in range(0, len(librerie), batch_size):
+            batch = librerie[i:i + batch_size]
+            self._log(f"      - Rimozione {len(batch)} librerie...")
+            cmd = "sudo apt-get purge -y " + " ".join(batch)
+            ok, out = self._esegui_comando(cmd, timeout=600)
+            if not ok:
+                self._log(f"      ⚠️  {out[:200]}")
+        self._log(f"   {_('deborphan_ok')}")
+
+    def _pulisci_apt_lists(self):
+        self._log("   Eliminazione vecchie liste...")
+        ok, out = self._esegui_comando(
+            "sudo rm -rf /var/lib/apt/lists/*", timeout=60)
+        if not ok:
+            self._log(f"   {_('apt_lists_err')}: {out[:200]}")
+            return
+        self._log("   Download nuove liste (può richiedere 1-2 min)...")
+        ok, out = self._esegui_comando("sudo apt-get update", timeout=600)
+        if ok:
+            self._log(f"   {_('apt_lists_ok')}")
+        else:
+            self._log(f"   {_('apt_lists_err')}: {out[:200]}")
+
     def _gestisci_kernel(self):
         try:
             r = subprocess.run(["uname", "-r"],
@@ -1355,7 +1401,7 @@ class PuliziaApp:
         txt.config(yscrollcommand=sb.set)
 
         txt.insert(tk.END, f"{_('disk_path'):<45} {_('disk_size'):>12}\n")
-        txt.insert(tk.END, "─" * 60 + "\n")
+        txt.insert(tk.END, "-" * 60 + "\n")
 
         def analizza():
             home = os.path.expanduser("~")
@@ -1395,7 +1441,7 @@ class PuliziaApp:
                 txt.insert(tk.END, f"{etichetta:<45} "
                                    f"{self._bytes_a_human(size):>12}\n")
             totale = sum(r[1] for r in risultati)
-            txt.insert(tk.END, "─" * 60 + "\n")
+            txt.insert(tk.END, "-" * 60 + "\n")
             txt.insert(tk.END, f"{_('disk_total'):<45} "
                                f"{self._bytes_a_human(totale):>12}\n")
             lbl_stato.config(text=_("disk_done"), fg="#2ecc71")
@@ -1429,7 +1475,6 @@ class PuliziaApp:
         self.root.clipboard_append("\n".join(self.report_lines))
         messagebox.showinfo("OK", _("copy_ok"))
 
-    # --- GUIDA ---
     def apri_guida(self):
         win = tk.Toplevel(self.root)
         win.title(_("help_title"))
@@ -1488,11 +1533,11 @@ class PuliziaApp:
             marker = f"sec_{len(markers)}"
             txt.mark_set(marker, tk.END)
             markers.append(marker)
-            txt.insert(tk.END, f"▶ {titolo}\n", "section")
+            txt.insert(tk.END, f"> {titolo}\n", "section")
             for riga in contenuto.strip().split("\n"):
                 if not riga.strip():
                     txt.insert(tk.END, "\n")
-                elif riga.strip()[:1] in "•✓❌📋💾⚠️" or \
+                elif riga.strip()[:1] in "*-" or \
                         riga.strip()[:2] in ("D:", "R:", "Q:", "A:"):
                     txt.insert(tk.END, "  " + riga + "\n", "bullet")
                 elif riga.strip().startswith(("sudo", "systemctl", "cat ",
@@ -1530,7 +1575,6 @@ class PuliziaApp:
         win.geometry(f"{larg}x{alt}+{(sw-larg)//2}+{(sh-alt)//2}")
         win.focus_set()
 
-    # --- CRON ---
     def _cron_service_attivo(self):
         try:
             r = subprocess.run(["systemctl", "is-active", "cron"],
@@ -1559,7 +1603,7 @@ class PuliziaApp:
         win.transient(self.root)
         win.grab_set()
         win.resizable(False, False)
-        win.minsize(560, 600)
+        win.minsize(560, 620)
 
         tk.Label(win, text=_("sched_title"), font=("Ubuntu", 15, "bold"),
                  bg="#2c3e50", fg="#ecf0f1").pack(pady=(15, 5))
@@ -1567,7 +1611,6 @@ class PuliziaApp:
                  bg="#2c3e50", fg="#95a5a6",
                  justify="center").pack(pady=(0, 10))
 
-        # Stato servizio
         fs = tk.LabelFrame(win, text=" " + _("sched_service_title") + " ",
                            font=("Ubuntu", 10, "bold"),
                            bg="#34495e", fg="#ecf0f1", bd=2, relief="groove")
@@ -1651,7 +1694,6 @@ class PuliziaApp:
         elif cron_attivo is False:
             btn_di.config(state=tk.DISABLED)
 
-        # Configurazione
         fc = tk.LabelFrame(win, text=" " + _("sched_config_title") + " ",
                            font=("Ubuntu", 10, "bold"),
                            bg="#34495e", fg="#ecf0f1", bd=2, relief="groove")
@@ -1758,7 +1800,7 @@ class PuliziaApp:
         win.geometry("")
         win.update_idletasks()
         larg = max(win.winfo_reqwidth(), 560)
-        alt = max(win.winfo_reqheight(), 600)
+        alt = max(win.winfo_reqheight(), 620)
         sw = win.winfo_screenwidth()
         sh = win.winfo_screenheight()
         win.geometry(f"{larg}x{alt}+{(sw-larg)//2}+{(sh-alt)//2}")
@@ -1781,6 +1823,9 @@ if command -v snap &>/dev/null; then
 fi
 find /tmp -type f -atime +7 -delete 2>/dev/null
 find /var/tmp -type f -atime +30 -delete 2>/dev/null
+for pkg in $(dpkg -l | awk '/^rc/{print $2}'); do
+    apt-get purge -y "$pkg" >> "$LOG" 2>&1
+done
 DOPO=$(df -B1 / | tail -1 | awk '{print $4}')
 LIBERATO=$(( DOPO - PRIMA ))
 if [ "$LIBERATO" -gt 0 ]; then
