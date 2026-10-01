@@ -3,6 +3,25 @@
 Tutte le modifiche importanti di questo progetto sono documentate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
+## [4.2] - 2026-10-01
+
+### Modificato
+- GUI principale compatta (rimosso report interno)
+- Report spostato solo nella finestra finale unificata
+- Menu "Strumenti" a tendina (Schedula, Analisi, Statistiche, Shred)
+- Opzioni organizzate in 3 gruppi collassabili (Browser, Sistema, Avanzate)
+
+### Rimosso
+- Popup separato di fine pulizia
+- Grafico in finestra separata
+- Report dalla finestra principale
+- Finestra finale unificata con grafico + report
+
+## [4.0] - 2026-10-01
+
+### Modificato
+- Riorganizzazione GUI: toolbar compatta e gruppi di opzioni
+
 ## [3.1] - 2026-10-01
 
 ### Aggiunto
