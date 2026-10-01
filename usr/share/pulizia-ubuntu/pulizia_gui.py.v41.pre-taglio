@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "4.2"
+APP_VERSION = "4.1"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -1065,7 +1065,31 @@ class PuliziaApp:
                                   bg=T("bg"), fg=T("accent"))
         self.lbl_stato.pack(pady=4)
 
-        # Report rimosso dalla finestra principale (vedi _mostra_report_finale)
+        frame_head = tk.Frame(self.root, bg=T("bg"))
+        frame_head.pack(fill=tk.X, padx=20, pady=(6, 0))
+
+        self.lbl_report = tk.Label(frame_head, text=_("report_label"),
+                                   font=("Ubuntu", 11, "bold"),
+                                   bg=T("bg"), fg=T("fg"))
+        self.lbl_report.pack(side=tk.LEFT)
+
+        self.btn_salva = tk.Button(frame_head, text=_("btn_save"),
+                                   font=("Ubuntu", 9), bg="#16a085", fg="white",
+                                   relief="flat", cursor="hand2",
+                                   command=self.salva_report, state=tk.DISABLED)
+        self.btn_salva.pack(side=tk.RIGHT, padx=4)
+
+        self.btn_copia = tk.Button(frame_head, text=_("btn_copy"),
+                                   font=("Ubuntu", 9), bg="#8e44ad", fg="white",
+                                   relief="flat", cursor="hand2",
+                                   command=self.copia_report, state=tk.DISABLED)
+        self.btn_copia.pack(side=tk.RIGHT, padx=4)
+
+        self.txt_report = scrolledtext.ScrolledText(
+            self.root, wrap=tk.WORD, width=90, height=12,
+            font=("Ubuntu Mono", 9), bg=T("bg_text"), fg=T("fg"),
+            insertbackground="white", relief="flat", state=tk.DISABLED)
+        self.txt_report.pack(padx=20, pady=(5, 12), fill=tk.BOTH, expand=True)
 
     def _crea_gruppo_opt(self, parent, titolo, icona, default_open=False):
         """Crea un gruppo collassabile di opzioni."""
@@ -1078,7 +1102,7 @@ class PuliziaApp:
 
         # Freccia
         freccia = tk.Label(
-            header, text="\u25be" if default_open else "\u25b8",
+            header, text="▾" if default_open else "▸",
             font=("Ubuntu", 10, "bold"),
             bg=T("bg_widget"), fg=T("accent"),
             cursor="hand2", width=2)
@@ -1101,11 +1125,11 @@ class PuliziaApp:
         def toggle(event=None):
             if stato["aperto"]:
                 contenuto.pack_forget()
-                freccia.config(text="\u25b8")
+                freccia.config(text="▸")
                 stato["aperto"] = False
             else:
                 contenuto.pack(fill=tk.X, pady=(2, 4))
-                freccia.config(text="\u25be")
+                freccia.config(text="▾")
                 stato["aperto"] = True
 
         freccia.bind("<Button-1>", toggle)
@@ -1178,18 +1202,29 @@ class PuliziaApp:
         self.btn_esegui.config(text=_("btn_run"))
         self.btn_guida.config(text=_("btn_help_short"))
         self.btn_esci.config(text=_("btn_exit_short"))
+        self.btn_salva.config(text=_("btn_save"))
+        self.btn_copia.config(text=_("btn_copy"))
+        self.lbl_report.config(text=_("report_label"))
         self.lbl_stato.config(text=_("status_ready"))
 
     def _avvia_poller_coda(self):
         try:
             while True:
                 tipo, payload = self.ui_queue.get_nowait()
-                if tipo == "stato":
+                if tipo == "log":
+                    self.txt_report.config(state=tk.NORMAL)
+                    self.txt_report.insert(tk.END, payload + "\n")
+                    self.txt_report.see(tk.END)
+                    self.txt_report.config(state=tk.DISABLED)
+                elif tipo == "stato":
                     self.lbl_stato.config(text=payload)
                 elif tipo == "progress":
                     self.progress["value"] = payload
                 elif tipo == "abilita_pulsanti":
                     self._set_pulsanti(payload)
+                elif tipo == "abilita_report":
+                    self.btn_salva.config(state=tk.NORMAL)
+                    self.btn_copia.config(state=tk.NORMAL)
                 elif tipo == "info":
                     messagebox.showinfo(*payload)
                 elif tipo == "error":
@@ -1389,6 +1424,7 @@ class PuliziaApp:
 
     def _log(self, testo):
         self.report_lines.append(testo)
+        self.ui_queue.put(("log", testo))
 
     def _set_stato(self, testo):
         self.ui_queue.put(("stato", testo))
@@ -1527,6 +1563,9 @@ class PuliziaApp:
             return
         self.in_esecuzione = True
         self._set_pulsanti(False)
+        self.txt_report.config(state=tk.NORMAL)
+        self.txt_report.delete("1.0", tk.END)
+        self.txt_report.config(state=tk.DISABLED)
         self.report_lines = []
         self._set_progress(0)
         threading.Thread(target=self._esegui_pulizia, daemon=True).start()
@@ -1653,6 +1692,7 @@ class PuliziaApp:
 
             self._set_stato(_("status_done"))
             self._set_progress(100)
+            self.ui_queue.put(("abilita_report", True))
             # Salva statistica
             self._salva_statistica(liberato)
 
