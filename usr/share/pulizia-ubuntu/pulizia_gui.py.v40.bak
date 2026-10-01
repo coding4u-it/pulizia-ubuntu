@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "4.1"
+APP_VERSION = "4.0"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -282,11 +282,6 @@ TRANSLATIONS = {
         "menu_disk": "📊  Analisi spazio disco",
         "menu_stats": "📈  Statistiche pulizie",
         "menu_shred": "🔐  Cancellazione sicura",
-        "final_title": "📋 Riepilogo pulizia",
-        "final_freed": "✅ Spazio liberato: {0}",
-        "final_no_change": "ℹ️  Nessuna variazione significativa",
-        "final_used": "⚠️  {0} occupati (attività di sistema)",
-        "final_close": "✔  Chiudi",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -513,11 +508,6 @@ TRANSLATIONS = {
         "menu_disk": "📊  Disk space analysis",
         "menu_stats": "📈  Cleanup statistics",
         "menu_shred": "🔐  Secure deletion",
-        "final_title": "📋 Cleanup summary",
-        "final_freed": "✅ Space freed: {0}",
-        "final_no_change": "ℹ️  No significant change",
-        "final_used": "⚠️  {0} used (system activity)",
-        "final_close": "✔  Close",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -1232,186 +1222,82 @@ class PuliziaApp:
                 elif tipo == "warning":
                     messagebox.showwarning(*payload)
                 elif tipo == "grafico":
-                    self._mostra_report_finale(*payload)
+                    self._mostra_grafico(*payload)
         except queue.Empty:
             pass
         finally:
             self.root.after(100, self._avvia_poller_coda)
 
-    def _mostra_report_finale(self, prima, dopo, totale):
-        """Mostra finestra unificata: grafico compatto + report."""
-        win = tk.Toplevel(self.root)
-        win.title(_("final_title"))
-        win.geometry("820x760")
-        win.minsize(720, 620)
-        win.configure(bg=T("bg"))
-        win.transient(self.root)
-
-        # ============================================================
-        # HEADER
-        # ============================================================
-        tk.Label(win, text=_("final_title"),
-                 font=("Ubuntu", 16, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 4))
-
-        # Delta spazio
-        delta = dopo - prima
-        if delta > 0:
-            testo_delta = _("final_freed",
-                            self._bytes_a_human(delta))
-            colore_delta = T("success")
-        elif delta == 0:
-            testo_delta = _("final_no_change")
-            colore_delta = T("fg_muted")
-        else:
-            testo_delta = _("final_used",
-                            self._bytes_a_human(abs(delta)))
-            colore_delta = T("error")
-
-        tk.Label(win, text=testo_delta,
-                 font=("Ubuntu", 12, "bold"),
-                 bg=T("bg"), fg=colore_delta).pack(pady=(0, 8))
-
-        # ============================================================
-        # GRAFICO COMPATTO (in alto)
-        # ============================================================
-        frame_graph = tk.Frame(win, bg=T("bg"))
-        frame_graph.pack(fill=tk.X, padx=20, pady=4)
-
+    def _mostra_grafico(self, prima, dopo, totale):
         try:
             import matplotlib
             matplotlib.use("TkAgg")
             from matplotlib.figure import Figure
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
-            # Figura compatta (8x3 pollici)
-            fig = Figure(figsize=(8, 2.8), dpi=90, facecolor=T("bg"))
-            ax = fig.add_subplot(111, facecolor=T("bg_text"))
-
-            usato_prima = totale - prima
-            usato_dopo = totale - dopo
-
-            labels = [_("graph_before"), _("graph_after")]
-            usati_gb = [usato_prima / (1024**3), usato_dopo / (1024**3)]
-            liberi_gb = [prima / (1024**3), dopo / (1024**3)]
-
-            x = [0, 1]
-            ax.bar(x, usati_gb, 0.5, label=_("graph_used"),
-                   color="#e74c3c", edgecolor="white", linewidth=0.5)
-            ax.bar(x, liberi_gb, 0.5, bottom=usati_gb,
-                   label=_("graph_free"), color="#27ae60",
-                   edgecolor="white", linewidth=0.5)
-
-            # Etichette valori (solo se spazio sufficiente)
-            for i, (u, f) in enumerate(zip(usati_gb, liberi_gb)):
-                if u > 1:
-                    ax.text(i, u / 2, f"{u:.1f} GB",
-                            ha="center", va="center",
-                            color="white", fontweight="bold", fontsize=9)
-                if f > 1:
-                    ax.text(i, u + f / 2, f"{f:.1f} GB",
-                            ha="center", va="center",
-                            color="white", fontweight="bold", fontsize=9)
-
-            ax.set_xticks(x)
-            ax.set_xticklabels(labels, color=T("fg"), fontsize=10)
-            ax.set_ylabel("GB", color=T("fg"), fontsize=9)
-            ax.tick_params(axis="y", colors=T("fg"), labelsize=8)
-            ax.spines["bottom"].set_color(T("border"))
-            ax.spines["left"].set_color(T("border"))
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-            ax.grid(axis="y", linestyle="--", alpha=0.3, color=T("border"))
-            ax.legend(loc="upper right",
-                      facecolor=T("bg_widget"),
-                      edgecolor=T("border"),
-                      labelcolor=T("fg"),
-                      fontsize=8)
-            fig.tight_layout()
-
-            canvas = FigureCanvasTkAgg(fig, master=frame_graph)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.X, expand=False)
-
         except ImportError:
-            tk.Label(frame_graph, text=_("graph_no_mpl"),
-                     font=("Ubuntu", 10),
-                     bg=T("bg"), fg=T("accent"),
-                     justify="center").pack(pady=20)
+            messagebox.showwarning(_("graph_title"), _("graph_no_mpl"))
+            return
 
-        # ============================================================
-        # SEPARATORE
-        # ============================================================
-        tk.Frame(win, height=1, bg=T("border")).pack(
-            fill=tk.X, padx=20, pady=8)
+        win = tk.Toplevel(self.root)
+        win.title(_("graph_title"))
+        win.geometry("700x500")
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
 
-        # ============================================================
-        # HEADER REPORT + pulsanti Salva/Copia
-        # ============================================================
-        frame_head = tk.Frame(win, bg=T("bg"))
-        frame_head.pack(fill=tk.X, padx=20, pady=(0, 4))
+        usato_prima = totale - prima
+        usato_dopo = totale - dopo
 
-        tk.Label(frame_head, text=_("report_label"),
-                 font=("Ubuntu", 11, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(side=tk.LEFT)
+        fig = Figure(figsize=(7, 4.5), dpi=100, facecolor="#2c3e50")
+        ax = fig.add_subplot(111, facecolor="#1c2833")
+        labels = [_("graph_before"), _("graph_after")]
+        usati_gb = [usato_prima / (1024**3), usato_dopo / (1024**3)]
+        liberi_gb = [prima / (1024**3), dopo / (1024**3)]
 
-        btn_salva = tk.Button(
-            frame_head, text=_("btn_save"),
-            font=("Ubuntu", 9),
-            bg="#16a085", fg="white",
-            activebackground="#1abc9c", activeforeground="white",
-            relief="flat", cursor="hand2", padx=8,
-            command=self.salva_report)
-        btn_salva.pack(side=tk.RIGHT, padx=4)
+        x = [0, 1]
+        ax.bar(x, usati_gb, 0.5, label=_("graph_used"),
+               color="#e74c3c", edgecolor="white", linewidth=0.5)
+        ax.bar(x, liberi_gb, 0.5, bottom=usati_gb,
+               label=_("graph_free"), color="#27ae60",
+               edgecolor="white", linewidth=0.5)
 
-        btn_copia = tk.Button(
-            frame_head, text=_("btn_copy"),
-            font=("Ubuntu", 9),
-            bg="#8e44ad", fg="white",
-            activebackground="#9b59b6", activeforeground="white",
-            relief="flat", cursor="hand2", padx=8,
-            command=self.copia_report)
-        btn_copia.pack(side=tk.RIGHT, padx=4)
+        for i, (u, f) in enumerate(zip(usati_gb, liberi_gb)):
+            if u > 0.5:
+                ax.text(i, u / 2, f"{u:.1f} GB", ha="center", va="center",
+                        color="white", fontweight="bold", fontsize=10)
+            if f > 0.5:
+                ax.text(i, u + f / 2, f"{f:.1f} GB", ha="center", va="center",
+                        color="white", fontweight="bold", fontsize=10)
 
-        # ============================================================
-        # REPORT SCROLLABILE
-        # ============================================================
-        frame_report = tk.Frame(win, bg=T("bg"))
-        frame_report.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 8))
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, color="#ecf0f1", fontsize=11)
+        ax.set_ylabel("GB", color="#ecf0f1")
+        ax.tick_params(axis="y", colors="#ecf0f1")
+        ax.spines["bottom"].set_color("#7f8c8d")
+        ax.spines["left"].set_color("#7f8c8d")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(axis="y", linestyle="--", alpha=0.3, color="#7f8c8d")
+        ax.legend(loc="upper right", facecolor="#34495e",
+                  edgecolor="white", labelcolor="#ecf0f1")
 
-        txt = scrolledtext.ScrolledText(
-            frame_report, wrap=tk.WORD,
-            font=("Ubuntu Mono", 9),
-            bg=T("bg_text"), fg=T("fg"),
-            insertbackground=T("fg"),
-            relief="flat", padx=8, pady=8, height=12)
-        txt.pack(fill=tk.BOTH, expand=True)
+        delta = dopo - prima
+        if delta > 0:
+            titolo = f"{_('graph_title')}  (+{delta / (1024**3):.2f} GB)"
+            fig.suptitle(titolo, color="#2ecc71",
+                         fontsize=13, fontweight="bold")
+        else:
+            fig.suptitle(_("graph_title"), color="#ecf0f1",
+                         fontsize=13, fontweight="bold")
+        fig.tight_layout()
 
-        # Popola con il report
-        txt.insert(tk.END, "\n".join(self.report_lines))
-        txt.config(state=tk.DISABLED)
-        # Scroll in fondo
-        txt.see(tk.END)
-
-        # ============================================================
-        # PULSANTE CHIUDI
-        # ============================================================
-        frame_btn = tk.Frame(win, bg=T("bg"))
-        frame_btn.pack(pady=10)
-
-        tk.Button(frame_btn, text=_("final_close"),
-                  font=("Ubuntu", 11, "bold"),
-                  bg="#27ae60", fg="white",
-                  activebackground="#2ecc71", activeforeground="white",
-                  relief="flat", cursor="hand2",
-                  width=14, height=2,
-                  command=win.destroy).pack()
-
-        win.bind("<Escape>", lambda e: win.destroy())
-
-    def _mostra_grafico(self, prima, dopo, totale):
-        """[DEPRECATO] Chiama _mostra_report_finale."""
-        self._mostra_report_finale(prima, dopo, totale)
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True,
+                                    padx=10, pady=10)
+        tk.Button(win, text="OK", font=("Ubuntu", 10, "bold"),
+                  bg="#27ae60", fg="white", relief="flat",
+                  width=12, cursor="hand2",
+                  command=win.destroy).pack(pady=8)
 
     def _calcola_spazio_iniziale(self):
         try:
@@ -1702,7 +1588,11 @@ class PuliziaApp:
             self.ui_queue.put(("grafico",
                                (self.spazio_prima, self.spazio_dopo,
                                 self.totale_disco)))
-            # Il popup è ora dentro _mostra_report_finale
+            self.ui_queue.put(("info", (
+                _("done_title"),
+                _("done_msg",
+                  self._bytes_a_human(max(liberato, 0)),
+                  self._bytes_a_human(self.spazio_dopo)))))
         except Exception as e:
             debug_log(f"_esegui_pulizia: {e}")
             self._log(f"\n❌ {e}")
