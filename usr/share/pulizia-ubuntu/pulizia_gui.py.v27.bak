@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "3.0"
+APP_VERSION = "2.7"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -110,7 +110,7 @@ STATS_DIR = os.path.expanduser("~/.local/share/pulizia-ubuntu")
 TRANSLATIONS = {
     "it": {
         "app_title": "🧹 Pulizia di Sistema",
-        "subtitle": "Ubuntu 26.04 LTS - Manutenzione completa",
+        "subtitle": "Ubuntu 26.04 LTS - Manutenzione sicura",
         "options_title": " ⚙️  Opzioni di pulizia ",
         "opt_browser": "Pulizia cache browser (seleziona quali)",
         "opt_snap": "Rimozione vecchie revisioni Snap",
@@ -220,31 +220,6 @@ TRANSLATIONS = {
         "stats_freed": "Liberato",
         "theme_label": "🎨 Tema:",
         "theme_names": "dark=Scuro, light=Chiaro, nord=Nord, dracula=Dracula, solarized=Solarized",
-        "opt_flatpak": "Pulizia runtime Flatpak inutilizzati",
-        "opt_docker": "Pulizia Docker (container/immagini/volumi)",
-        "opt_trim": "Esecuzione TRIM su SSD",
-        "opt_recent": "Pulizia file recenti (recently-used)",
-        "step_flatpak": "[14] Pulizia Flatpak...",
-        "step_docker": "[15] Pulizia Docker...",
-        "step_trim": "[16] TRIM SSD...",
-        "step_recent": "[17] Pulizia file recenti...",
-        "flatpak_none": "ℹ️  Flatpak non installato",
-        "flatpak_ok": "✅ Runtime Flatpak inutilizzati rimossi",
-        "flatpak_err": "⚠️  Errore Flatpak",
-        "docker_none": "ℹ️  Docker non installato",
-        "docker_inactive": "ℹ️  Servizio Docker non attivo",
-        "docker_containers": "Rimozione container fermi...",
-        "docker_images": "Rimozione immagini dangling...",
-        "docker_volumes": "Rimozione volumi orfani...",
-        "docker_networks": "Rimozione reti inutilizzate...",
-        "docker_ok": "✅ Docker pulito",
-        "trim_none": "ℹ️  fstrim non disponibile",
-        "trim_timer": "Timer fstrim: {0}",
-        "trim_running": "Esecuzione TRIM (può richiedere tempo)...",
-        "trim_ok": "✅ TRIM completato",
-        "trim_err": "⚠️  Errore TRIM",
-        "recent_ok": "✅ File recenti rimossi",
-        "recent_none": "ℹ️  Nessun file recente",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -409,31 +384,6 @@ TRANSLATIONS = {
         "stats_freed": "Freed",
         "theme_label": "🎨 Theme:",
         "theme_names": "dark=Dark, light=Light, nord=Nord, dracula=Dracula, solarized=Solarized",
-        "opt_flatpak": "Clean unused Flatpak runtimes",
-        "opt_docker": "Docker cleanup (containers/images/volumes)",
-        "opt_trim": "Run SSD TRIM",
-        "opt_recent": "Clean recently-used files",
-        "step_flatpak": "[14] Flatpak cleanup...",
-        "step_docker": "[15] Docker cleanup...",
-        "step_trim": "[16] SSD TRIM...",
-        "step_recent": "[17] Recently-used cleanup...",
-        "flatpak_none": "ℹ️  Flatpak not installed",
-        "flatpak_ok": "✅ Unused Flatpak runtimes removed",
-        "flatpak_err": "⚠️  Flatpak error",
-        "docker_none": "ℹ️  Docker not installed",
-        "docker_inactive": "ℹ️  Docker service not active",
-        "docker_containers": "Removing stopped containers...",
-        "docker_images": "Removing dangling images...",
-        "docker_volumes": "Removing orphan volumes...",
-        "docker_networks": "Removing unused networks...",
-        "docker_ok": "✅ Docker cleaned",
-        "trim_none": "ℹ️  fstrim not available",
-        "trim_timer": "fstrim timer: {0}",
-        "trim_running": "Running TRIM (may take time)...",
-        "trim_ok": "✅ TRIM completed",
-        "trim_err": "⚠️  TRIM error",
-        "recent_ok": "✅ Recently-used files removed",
-        "recent_none": "ℹ️  No recently-used files",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -723,10 +673,6 @@ class PuliziaApp:
         self.var_thumbnails = tk.BooleanVar(value=True)
         self.var_trash = tk.BooleanVar(value=True)
         self.var_apt_purge = tk.BooleanVar(value=True)
-        self.var_flatpak = tk.BooleanVar(value=True)
-        self.var_docker = tk.BooleanVar(value=False)
-        self.var_trim = tk.BooleanVar(value=False)
-        self.var_recent = tk.BooleanVar(value=True)
         self.var_apt_deborphan = tk.BooleanVar(value=False)
         self.var_apt_lists = tk.BooleanVar(value=False)
         self.var_kernels = tk.BooleanVar(value=False)
@@ -853,10 +799,6 @@ class PuliziaApp:
                          ("opt_apt_purge", self.var_apt_purge),
                          ("opt_apt_deborphan", self.var_apt_deborphan),
                          ("opt_apt_lists", self.var_apt_lists),
-                         ("opt_flatpak", self.var_flatpak),
-                         ("opt_docker", self.var_docker),
-                         ("opt_trim", self.var_trim),
-                         ("opt_recent", self.var_recent),
                          ("opt_kernels", self.var_kernels)]:
             cb = tk.Checkbutton(self.frame_opt, text=_(key), variable=var,
                                 font=("Ubuntu", 10),
@@ -1294,14 +1236,6 @@ class PuliziaApp:
                 passi.append((_("step_apt_deborphan"), "DEBORPHAN"))
             if self.var_apt_lists.get():
                 passi.append((_("step_apt_lists"), "APT_LISTS"))
-            if self.var_flatpak.get():
-                passi.append((_("step_flatpak"), "FLATPAK"))
-            if self.var_docker.get():
-                passi.append((_("step_docker"), "DOCKER"))
-            if self.var_trim.get():
-                passi.append((_("step_trim"), "TRIM"))
-            if self.var_recent.get():
-                passi.append((_("step_recent"), "RECENT"))
             if self.var_kernels.get():
                 passi.append((_("step_kernels"), "KERNELS"))
 
@@ -1328,14 +1262,6 @@ class PuliziaApp:
                     self._pulisci_deborphan()
                 elif cmd == "APT_LISTS":
                     self._pulisci_apt_lists()
-                elif cmd == "FLATPAK":
-                    self._pulisci_flatpak()
-                elif cmd == "DOCKER":
-                    self._pulisci_docker()
-                elif cmd == "TRIM":
-                    self._esegui_trim()
-                elif cmd == "RECENT":
-                    self._pulisci_recently_used()
                 elif cmd == "KERNELS":
                     self._gestisci_kernel()
                 else:
@@ -1641,138 +1567,6 @@ class PuliziaApp:
                 self._log(f"      ✅ OK")
             else:
                 self._log(f"      ⚠️  {out[:200]}")
-
-    def _pulisci_flatpak(self):
-        """Rimuove runtime Flatpak inutilizzati."""
-        if not shutil.which("flatpak"):
-            self._log(f"   {_('flatpak_none')}")
-            return
-
-        # 1. Rimuovi runtime inutilizzati
-        self._log("   Ricerca runtime inutilizzati...")
-        ok, out = self._esegui_comando(
-            "flatpak uninstall --unused -y 2>&1", timeout=300)
-        if ok:
-            righe = [r for r in (out or "").split("\n") if r.strip()]
-            if righe:
-                for r in righe[-5:]:
-                    self._log(f"      {r}")
-                self._log(f"   {_('flatpak_ok')}")
-            else:
-                self._log(f"   {_('flatpak_none')}")
-        else:
-            self._log(f"   {_('flatpak_err')}: {out[:200]}")
-
-        # 2. Pulizia cache Flatpak (repo)
-        if os.path.exists(os.path.expanduser("~/.local/share/flatpak/repo")):
-            self._esegui_comando(
-                "flatpak repair --user 2>&1 | head -3",
-                timeout=120)
-
-    def _pulisci_docker(self):
-        """Rimuove container, immagini e volumi Docker inutilizzati."""
-        if not shutil.which("docker"):
-            self._log(f"   {_('docker_none')}")
-            return
-
-        # Verifica che il servizio sia attivo
-        r = subprocess.run(["systemctl", "is-active", "docker"],
-                           capture_output=True, text=True, timeout=5)
-        if r.stdout.strip() != "active":
-            self._log(f"   {_('docker_inactive')}")
-            return
-
-        # 1. Container fermi
-        self._log(f"   {_('docker_containers')}")
-        ok, out = self._esegui_comando(
-            "docker container prune -f 2>&1", timeout=120)
-        if ok:
-            for riga in (out or "").split("\n")[-3:]:
-                if riga.strip():
-                    self._log(f"      {riga}")
-
-        # 2. Immagini dangling
-        self._log(f"   {_('docker_images')}")
-        ok, out = self._esegui_comando(
-            "docker image prune -f 2>&1", timeout=180)
-        if ok:
-            for riga in (out or "").split("\n")[-3:]:
-                if riga.strip():
-                    self._log(f"      {riga}")
-
-        # 3. Volumi orfani
-        self._log(f"   {_('docker_volumes')}")
-        ok, out = self._esegui_comando(
-            "docker volume prune -f 2>&1", timeout=120)
-        if ok:
-            for riga in (out or "").split("\n")[-3:]:
-                if riga.strip():
-                    self._log(f"      {riga}")
-
-        # 4. Reti inutilizzate
-        self._log(f"   {_('docker_networks')}")
-        self._esegui_comando("docker network prune -f 2>&1", timeout=60)
-
-        self._log(f"   {_('docker_ok')}")
-
-    def _esegui_trim(self):
-        """Esegue TRIM sugli SSD."""
-        # Verifica che fstrim esista
-        if not shutil.which("fstrim"):
-            self._log(f"   {_('trim_none')}")
-            return
-
-        # Stato del timer
-        r = subprocess.run(
-            ["systemctl", "is-active", "fstrim.timer"],
-            capture_output=True, text=True, timeout=5)
-        stato = r.stdout.strip()
-        self._log(f"   {_('trim_timer', stato)}")
-
-        # Esegui TRIM su tutte le partizioni montate
-        self._log(f"   {_('trim_running')}")
-        ok, out = self._esegui_comando(
-            "sudo fstrim -av 2>&1", timeout=600)
-        if ok:
-            for riga in (out or "").split("\n"):
-                if riga.strip():
-                    self._log(f"      {riga}")
-            self._log(f"   {_('trim_ok')}")
-        else:
-            self._log(f"   {_('trim_err')}: {out[:200]}")
-
-    def _pulisci_recently_used(self):
-        """Rimuove la lista dei file recenti."""
-        home = os.path.expanduser("~")
-        file_recenti = [
-            f"{home}/.local/share/recently-used.xbel",
-            f"{home}/.local/share/recently-used.xbel.bak",
-        ]
-        rimossi = 0
-        dimensione = 0
-        for f in file_recenti:
-            if os.path.exists(f):
-                try:
-                    dimensione += os.path.getsize(f)
-                    os.remove(f)
-                    rimossi += 1
-                except Exception:
-                    pass
-
-        # Rimuovi anche cache di GNOME recent
-        cache_recent = f"{home}/.local/share/gnome-shell/application_state"
-        if os.path.exists(cache_recent):
-            try:
-                os.remove(cache_recent)
-                rimossi += 1
-            except Exception:
-                pass
-
-        if rimossi > 0:
-            self._log(f"   {_('recent_ok')} "
-                      f"({self._bytes_a_human(dimensione)})")
-        else:
-            self._log(f"   {_('recent_none')}")
 
     def analizza_disco(self):
         win = tk.Toplevel(self.root)

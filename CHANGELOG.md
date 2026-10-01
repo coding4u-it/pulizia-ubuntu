@@ -3,6 +3,19 @@
 Tutte le modifiche importanti di questo progetto sono documentate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
+## [3.0] - 2026-10-01
+
+### Aggiunto
+- 📦 Pulizia runtime Flatpak inutilizzati
+- 🐳 Pulizia Docker (container, immagini, volumi, reti)
+- ⚡ Esecuzione TRIM su SSD
+- 🗑 Pulizia file recently-used
+- 17 operazioni di pulizia totali
+
+### Sicurezza
+- Docker e TRIM disattivati di default
+- Ogni operazione controlla la disponibilità della dipendenza
+
 ## [2.7] - 2026-10-01
 
 ### Aggiunto
