@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "3.1"
+APP_VERSION = "3.0"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -245,33 +245,6 @@ TRANSLATIONS = {
         "trim_err": "⚠️  Errore TRIM",
         "recent_ok": "✅ File recenti rimossi",
         "recent_none": "ℹ️  Nessun file recente",
-        "btn_shred": "🔐 Shred",
-        "shred_title": "🔐 Cancellazione sicura (Shred)",
-        "shred_desc": "Sovrascrive i file con dati casuali prima di eliminarli.\nIl contenuto diventa irrecuperabile, anche con software di recovery.",
-        "shred_section_file": "File singolo",
-        "shred_section_dir": "Directory completa",
-        "shred_section_opts": "Opzioni",
-        "shred_section_log": "Log operazione",
-        "shred_browse": "📁 Sfoglia",
-        "shred_browse_file_title": "Seleziona file da cancellare",
-        "shred_browse_dir_title": "Seleziona directory da cancellare",
-        "shred_passes": "Passaggi di sovrascrittura:",
-        "shred_passes_hint": "(3 raccomandato, 35 massimo)",
-        "shred_zero": "Aggiungi passaggio finale con zeri (nasconde shred)",
-        "shred_remove": "Rimuovi file dopo la sovrascrittura",
-        "shred_warning": "⚠️  ATTENZIONE: operazione IRREVERSIBILE.\nI file cancellati non potranno essere recuperati in alcun modo.",
-        "shred_btn_file": "🔐 Shred file",
-        "shred_btn_dir": "🔐 Shred directory",
-        "shred_close": "Chiudi",
-        "shred_file": "file",
-        "shred_dir": "directory",
-        "shred_no_path": "Seleziona un file o una directory.",
-        "shred_not_exists": "Il percorso non esiste: {0}",
-        "shred_not_available": "Comando shred non disponibile.\nInstalla con: sudo apt install coreutils",
-        "shred_confirm_title": "⚠️  Conferma cancellazione",
-        "shred_confirm_msg": "Stai per cancellare IRREVERSIBILMENTE:\n\nTipo: {0}\nPercorso: {1}\nElementi: {2}\nDimensione: {3}\n\nProcedere?",
-        "shred_notif_title": "🔐 Shred completato",
-        "shred_notif_msg": "{0} file cancellati in modo sicuro",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -461,33 +434,6 @@ TRANSLATIONS = {
         "trim_err": "⚠️  TRIM error",
         "recent_ok": "✅ Recently-used files removed",
         "recent_none": "ℹ️  No recently-used files",
-        "btn_shred": "🔐 Shred",
-        "shred_title": "🔐 Secure deletion (Shred)",
-        "shred_desc": "Overwrites files with random data before deleting.\nContents become unrecoverable, even with recovery software.",
-        "shred_section_file": "Single file",
-        "shred_section_dir": "Full directory",
-        "shred_section_opts": "Options",
-        "shred_section_log": "Operation log",
-        "shred_browse": "📁 Browse",
-        "shred_browse_file_title": "Select file to shred",
-        "shred_browse_dir_title": "Select directory to shred",
-        "shred_passes": "Overwrite passes:",
-        "shred_passes_hint": "(3 recommended, 35 max)",
-        "shred_zero": "Add final zero pass (hides shred)",
-        "shred_remove": "Remove files after overwrite",
-        "shred_warning": "⚠️  WARNING: IRREVERSIBLE operation.\nDeleted files cannot be recovered in any way.",
-        "shred_btn_file": "🔐 Shred file",
-        "shred_btn_dir": "🔐 Shred directory",
-        "shred_close": "Close",
-        "shred_file": "file",
-        "shred_dir": "directory",
-        "shred_no_path": "Select a file or directory.",
-        "shred_not_exists": "Path does not exist: {0}",
-        "shred_not_available": "shred command not available.\nInstall with: sudo apt install coreutils",
-        "shred_confirm_title": "⚠️  Confirm deletion",
-        "shred_confirm_msg": "You are about to IRREVERSIBLY delete:\n\nType: {0}\nPath: {1}\nItems: {2}\nSize: {3}\n\nProceed?",
-        "shred_notif_title": "🔐 Shred completed",
-        "shred_notif_msg": "{0} files securely deleted",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -944,11 +890,6 @@ class PuliziaApp:
                                              self.mostra_statistiche, 13)
         self.btn_stats.pack(side=tk.LEFT, padx=4)
 
-        self.btn_shred = self._crea_pulsante(frame_btn, _("btn_shred"),
-                                             "#8e44ad", "#9b59b6",
-                                             self.apri_shred, 12)
-        self.btn_shred.pack(side=tk.LEFT, padx=4)
-
         self.btn_guida = self._crea_pulsante(frame_btn, _("btn_help"),
                                              "#8e44ad", "#9b59b6",
                                              self.apri_guida, 10)
@@ -1052,7 +993,6 @@ class PuliziaApp:
         self.btn_schedula.config(text=_("btn_schedule"))
         self.btn_disco.config(text=_("btn_disk"))
         self.btn_stats.config(text=_("btn_stats"))
-        self.btn_shred.config(text=_("btn_shred"))
         self.btn_guida.config(text=_("btn_help"))
         self.btn_esci.config(text=_("btn_exit"))
         self.btn_salva.config(text=_("btn_save"))
@@ -1834,354 +1774,6 @@ class PuliziaApp:
         else:
             self._log(f"   {_('recent_none')}")
 
-    # ------------------------------------------------------------------
-    # SHRED - CANCELLAZIONE SICURA
-    # ------------------------------------------------------------------
-    def apri_shred(self):
-        """Apre la finestra dello strumento Shred."""
-        win = tk.Toplevel(self.root)
-        win.title(_("shred_title"))
-        win.geometry("700x580")
-        win.configure(bg=T("bg"))
-        win.transient(self.root)
-        win.grab_set()
-
-        # --- Header ---
-        tk.Label(win, text=_("shred_title"),
-                 font=("Ubuntu", 15, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 4))
-
-        tk.Label(win, text=_("shred_desc"),
-                 font=("Ubuntu", 9, "italic"),
-                 bg=T("bg"), fg=T("fg_muted"),
-                 justify="center", wraplength=650).pack(pady=(0, 10))
-
-        # --- Sezione: file singolo ---
-        frame_file = tk.LabelFrame(
-            win, text=" " + _("shred_section_file") + " ",
-            font=("Ubuntu", 10, "bold"),
-            bg=T("bg_widget"), fg=T("fg"),
-            bd=2, relief="groove")
-        frame_file.pack(fill=tk.X, padx=20, pady=6)
-
-        frame_file_inner = tk.Frame(frame_file, bg=T("bg_widget"))
-        frame_file_inner.pack(fill=tk.X, padx=10, pady=8)
-
-        self.shred_path_var = tk.StringVar()
-        entry_path = tk.Entry(
-            frame_file_inner, textvariable=self.shred_path_var,
-            font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
-            insertbackground=T("fg"), relief="flat", bd=3)
-        entry_path.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
-
-        tk.Button(frame_file_inner, text=_("shred_browse"),
-                  font=("Ubuntu", 9, "bold"),
-                  bg="#3498db", fg="white", relief="flat",
-                  cursor="hand2", width=10,
-                  command=lambda: self._shred_browse_file()
-                  ).pack(side=tk.LEFT, padx=2)
-
-        # --- Sezione: directory ---
-        frame_dir = tk.LabelFrame(
-            win, text=" " + _("shred_section_dir") + " ",
-            font=("Ubuntu", 10, "bold"),
-            bg=T("bg_widget"), fg=T("fg"),
-            bd=2, relief="groove")
-        frame_dir.pack(fill=tk.X, padx=20, pady=6)
-
-        frame_dir_inner = tk.Frame(frame_dir, bg=T("bg_widget"))
-        frame_dir_inner.pack(fill=tk.X, padx=10, pady=8)
-
-        self.shred_dir_var = tk.StringVar()
-        entry_dir = tk.Entry(
-            frame_dir_inner, textvariable=self.shred_dir_var,
-            font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
-            insertbackground=T("fg"), relief="flat", bd=3)
-        entry_dir.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
-
-        tk.Button(frame_dir_inner, text=_("shred_browse"),
-                  font=("Ubuntu", 9, "bold"),
-                  bg="#3498db", fg="white", relief="flat",
-                  cursor="hand2", width=10,
-                  command=lambda: self._shred_browse_dir()
-                  ).pack(side=tk.LEFT, padx=2)
-
-        # --- Opzioni ---
-        frame_opt = tk.LabelFrame(
-            win, text=" " + _("shred_section_opts") + " ",
-            font=("Ubuntu", 10, "bold"),
-            bg=T("bg_widget"), fg=T("fg"),
-            bd=2, relief="groove")
-        frame_opt.pack(fill=tk.X, padx=20, pady=6)
-
-        self.shred_passes_var = tk.IntVar(value=3)
-        self.shred_zero_var = tk.BooleanVar(value=True)
-        self.shred_remove_var = tk.BooleanVar(value=True)
-
-        frame_opt_inner = tk.Frame(frame_opt, bg=T("bg_widget"))
-        frame_opt_inner.pack(fill=tk.X, padx=10, pady=8)
-
-        riga1 = tk.Frame(frame_opt_inner, bg=T("bg_widget"))
-        riga1.pack(fill=tk.X, pady=2)
-        tk.Label(riga1, text=_("shred_passes"),
-                 font=("Ubuntu", 10),
-                 bg=T("bg_widget"), fg=T("fg")).pack(side=tk.LEFT)
-        tk.Spinbox(riga1, from_=1, to=35,
-                   textvariable=self.shred_passes_var, width=5,
-                   font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
-                   buttonbackground=T("bg"),
-                   insertbackground=T("fg"),
-                   relief="flat").pack(side=tk.LEFT, padx=8)
-        tk.Label(riga1, text=_("shred_passes_hint"),
-                 font=("Ubuntu", 8, "italic"),
-                 bg=T("bg_widget"), fg=T("fg_muted")).pack(side=tk.LEFT)
-
-        tk.Checkbutton(frame_opt_inner, text=_("shred_zero"),
-                       variable=self.shred_zero_var,
-                       font=("Ubuntu", 10),
-                       bg=T("bg_widget"), fg=T("fg"),
-                       selectcolor=T("select_bg"),
-                       activebackground=T("bg_widget"),
-                       activeforeground=T("accent"),
-                       anchor="w").pack(fill=tk.X, pady=2)
-
-        tk.Checkbutton(frame_opt_inner, text=_("shred_remove"),
-                       variable=self.shred_remove_var,
-                       font=("Ubuntu", 10),
-                       bg=T("bg_widget"), fg=T("fg"),
-                       selectcolor=T("select_bg"),
-                       activebackground=T("bg_widget"),
-                       activeforeground=T("accent"),
-                       anchor="w").pack(fill=tk.X, pady=2)
-
-        # --- Warning ---
-        tk.Label(win, text=_("shred_warning"),
-                 font=("Ubuntu", 9, "bold"),
-                 bg=T("bg"), fg=T("error"),
-                 justify="center", wraplength=650).pack(pady=6, padx=20)
-
-        # --- Output log ---
-        frame_log = tk.LabelFrame(
-            win, text=" " + _("shred_section_log") + " ",
-            font=("Ubuntu", 10, "bold"),
-            bg=T("bg_widget"), fg=T("fg"),
-            bd=2, relief="groove")
-        frame_log.pack(fill=tk.BOTH, expand=True, padx=20, pady=6)
-
-        self.shred_log = tk.Text(
-            frame_log, wrap=tk.WORD, font=("Ubuntu Mono", 9),
-            bg=T("bg_text"), fg=T("fg"),
-            insertbackground=T("fg"),
-            relief="flat", height=6)
-        self.shred_log.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-
-        # --- Pulsanti azione ---
-        frame_btn = tk.Frame(win, bg=T("bg"))
-        frame_btn.pack(pady=10)
-
-        self.btn_shred_file = tk.Button(
-            frame_btn, text=_("shred_btn_file"),
-            font=("Ubuntu", 10, "bold"),
-            bg="#c0392b", fg="white", activebackground="#e74c3c",
-            activeforeground="white", relief="flat",
-            cursor="hand2", width=18, height=2,
-            command=lambda: self._shred_esegui("file", win))
-        self.btn_shred_file.pack(side=tk.LEFT, padx=4)
-
-        self.btn_shred_dir = tk.Button(
-            frame_btn, text=_("shred_btn_dir"),
-            font=("Ubuntu", 10, "bold"),
-            bg="#c0392b", fg="white", activebackground="#e74c3c",
-            activeforeground="white", relief="flat",
-            cursor="hand2", width=18, height=2,
-            command=lambda: self._shred_esegui("dir", win))
-        self.btn_shred_dir.pack(side=tk.LEFT, padx=4)
-
-        tk.Button(frame_btn, text=_("shred_close"),
-                  font=("Ubuntu", 10, "bold"),
-                  bg="#7f8c8d", fg="white", relief="flat",
-                  cursor="hand2", width=12, height=2,
-                  command=win.destroy).pack(side=tk.LEFT, padx=4)
-
-        win.bind("<Escape>", lambda e: win.destroy())
-
-    def _shred_browse_file(self):
-        """Apre dialog per selezionare un file."""
-        percorso = filedialog.askopenfilename(
-            title=_("shred_browse_file_title"))
-        if percorso:
-            self.shred_path_var.set(percorso)
-
-    def _shred_browse_dir(self):
-        """Apre dialog per selezionare una directory."""
-        percorso = filedialog.askdirectory(
-            title=_("shred_browse_dir_title"))
-        if percorso:
-            self.shred_dir_var.set(percorso)
-
-    def _shred_log(self, testo):
-        """Aggiunge una riga al log shred."""
-        try:
-            self.shred_log.insert(tk.END, testo + "\n")
-            self.shred_log.see(tk.END)
-            self.shred_log.update_idletasks()
-        except Exception:
-            pass
-
-    def _shred_esegui(self, modo, finestra):
-        """Esegue lo shred su file o directory."""
-        # Verifica che shred esista
-        if not shutil.which("shred"):
-            messagebox.showerror(_("error_title"),
-                                 _("shred_not_available"))
-            return
-
-        # Ottieni il percorso
-        if modo == "file":
-            percorso = self.shred_path_var.get().strip()
-            etichetta = _("shred_file")
-        else:
-            percorso = self.shred_dir_var.get().strip()
-            etichetta = _("shred_dir")
-
-        if not percorso:
-            messagebox.showwarning(_("shred_title"),
-                                   _("shred_no_path"))
-            return
-
-        if not os.path.exists(percorso):
-            messagebox.showerror(_("error_title"),
-                                 _("shred_not_exists", percorso))
-            return
-
-        # Conta elementi
-        if modo == "file":
-            n_elementi = 1
-            dimensione = os.path.getsize(percorso)
-        else:
-            n_elementi = 0
-            dimensione = 0
-            for root, dirs, files in os.walk(percorso):
-                for f in files:
-                    n_elementi += 1
-                    try:
-                        dimensione += os.path.getsize(os.path.join(root, f))
-                    except Exception:
-                        pass
-
-        # Conferma esplicita
-        msg = _("shred_confirm_msg",
-                etichetta, percorso, n_elementi,
-                self._bytes_a_human(dimensione))
-        if not messagebox.askyesno(_("shred_confirm_title"), msg):
-            return
-
-        # Pulisci log
-        try:
-            self.shred_log.delete("1.0", tk.END)
-        except Exception:
-            pass
-
-        # Disabilita pulsanti
-        self.btn_shred_file.config(state=tk.DISABLED)
-        self.btn_shred_dir.config(state=tk.DISABLED)
-
-        # Esegui in thread separato
-        threading.Thread(
-            target=self._shred_worker,
-            args=(modo, percorso, finestra),
-            daemon=True
-        ).start()
-
-    def _shred_worker(self, modo, percorso, finestra):
-        """Worker thread per lo shred."""
-        try:
-            passes = self.shred_passes_var.get()
-            zero = self.shred_zero_var.get()
-            remove = self.shred_remove_var.get()
-
-            self._shred_log("=" * 60)
-            self._shred_log(f"  SHRED - {datetime.now().strftime('%H:%M:%S')}")
-            self._shred_log("=" * 60)
-            self._shred_log(f"Percorso: {percorso}")
-            self._shred_log(f"Passaggi: {passes}")
-            self._shred_log(f"Aggiungi zero: {zero}")
-            self._shred_log(f"Rimuovi file: {remove}")
-            self._shred_log("")
-
-            # Costruisci comando shred
-            flags = [f"-n {passes}"]
-            if zero:
-                flags.append("-z")
-            if remove:
-                flags.append("-u")
-            flags_str = " ".join(flags)
-
-            file_list = []
-            if modo == "file":
-                file_list.append(percorso)
-            else:
-                for root, dirs, files in os.walk(percorso):
-                    for f in files:
-                        file_list.append(os.path.join(root, f))
-
-            totale = len(file_list)
-            self._shred_log(f"Elementi da cancellare: {totale}")
-            self._shred_log("")
-
-            completati = 0
-            errori_count = 0
-
-            for file_path in file_list:
-                completati += 1
-                nome = os.path.basename(file_path)
-
-                # Usa sudo per file di root
-                cmd_prefix = ""
-                if not os.access(file_path, os.W_OK):
-                    cmd_prefix = "sudo "
-
-                cmd = f'{cmd_prefix}shred {flags_str} "{file_path}" 2>&1'
-                ok, out = self._esegui_comando(cmd, timeout=600)
-
-                if ok:
-                    self._shred_log(f"[{completati}/{totale}] ✅ {nome}")
-                else:
-                    errori_count += 1
-                    self._shred_log(f"[{completati}/{totale}] ⚠️  {nome}: {out[:100]}")
-
-            # Rimuovi directory se era dir mode
-            if modo == "dir" and os.path.exists(percorso):
-                self._shred_log("")
-                self._shred_log("Rimozione directory...")
-                cmd_prefix = ""
-                if not os.access(percorso, os.W_OK):
-                    cmd_prefix = "sudo "
-                self._esegui_comando(
-                    f'{cmd_prefix}rm -rf "{percorso}" 2>&1', timeout=300)
-
-            self._shred_log("")
-            self._shred_log("=" * 60)
-            if errori_count == 0:
-                self._shred_log(f"✅ COMPLETATO - {completati} file cancellati")
-            else:
-                self._shred_log(f"⚠️  COMPLETATO con {errori_count} errori")
-            self._shred_log("=" * 60)
-
-            # Notifica
-            self._invia_notifica(
-                _("shred_notif_title"),
-                _("shred_notif_msg", completati))
-
-        except Exception as e:
-            self._shred_log(f"\n❌ ERRORE: {e}")
-        finally:
-            try:
-                self.btn_shred_file.config(state=tk.NORMAL)
-                self.btn_shred_dir.config(state=tk.NORMAL)
-            except Exception:
-                pass
-
     def analizza_disco(self):
         win = tk.Toplevel(self.root)
         win.title(_("disk_title"))
@@ -2881,7 +2473,6 @@ echo "" >> "$LOG"
         self.btn_schedula.config(state=stato)
         self.btn_disco.config(state=stato)
         self.btn_stats.config(state=stato)
-        self.btn_shred.config(state=stato)
         self.btn_guida.config(state=stato)
 
     def esci(self):

@@ -3,6 +3,20 @@
 Tutte le modifiche importanti di questo progetto sono documentate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
+## [3.1] - 2026-10-01
+
+### Aggiunto
+- 🔐 Strumento Shred per cancellazione sicura
+  - Supporto file singolo e directory complete
+  - Configurabile (1-35 passaggi, zero, rimozione)
+  - Log dettagliato in tempo reale
+  - Notifica desktop al termine
+- 17 operazioni di pulizia + Shred
+
+### Note
+- Shred è IRREVERSIBILE (conferma esplicita richiesta)
+- Non garantito su SSD (usare LUKS per sicurezza massima)
+
 ## [3.0] - 2026-10-01
 
 ### Aggiunto
@@ -21,10 +35,6 @@ Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 ### Aggiunto
 - 🎨 3 nuovi temi: Nord, Dracula, Solarized
 - Selettore tema esteso a 5 opzioni
-
-## [2.6] - 2026-10-01
-
-### Aggiunto
 - 🎨 Selettore tema chiaro/scuro
 - 💾 Persistenza preferenze in `~/.config/pulizia-ubuntu/settings.json`
 - 🔄 Cambio tema istantaneo senza riavviare l'app
