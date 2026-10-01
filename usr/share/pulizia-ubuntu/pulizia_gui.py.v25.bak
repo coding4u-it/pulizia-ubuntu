@@ -8,68 +8,9 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "2.6"
+APP_VERSION = "2.5"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
-
-# ======================================================================
-# TEMI E SETTINGS
-# ======================================================================
-SETTINGS_DIR = os.path.expanduser("~/.config/pulizia-ubuntu")
-SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
-
-THEMES = {
-    "dark": {
-        "bg":        "#2c3e50",
-        "bg_widget": "#34495e",
-        "bg_text":   "#1c2833",
-        "fg":        "#ecf0f1",
-        "fg_muted":  "#95a5a6",
-        "accent":    "#f39c12",
-        "success":   "#2ecc71",
-        "error":     "#e74c3c",
-        "select_bg": "#2c3e50",
-        "border":    "#7f8c8d",
-    },
-    "light": {
-        "bg":        "#f5f6fa",
-        "bg_widget": "#ffffff",
-        "bg_text":   "#ffffff",
-        "fg":        "#2c3e50",
-        "fg_muted":  "#7f8c8d",
-        "accent":    "#e67e22",
-        "success":   "#27ae60",
-        "error":     "#c0392b",
-        "select_bg": "#ffffff",
-        "border":    "#bdc3c7",
-    },
-}
-
-
-def carica_settings():
-    """Carica le preferenze utente."""
-    default = {"lang": None, "theme": None}
-    try:
-        if os.path.exists(SETTINGS_FILE):
-            with open(SETTINGS_FILE, encoding="utf-8") as f:
-                data = json.load(f)
-            default.update(data)
-    except Exception as e:
-        debug_log(f"carica_settings: {e}")
-    return default
-
-
-def salva_settings(**kwargs):
-    """Salva le preferenze utente."""
-    try:
-        os.makedirs(SETTINGS_DIR, exist_ok=True)
-        settings = carica_settings()
-        settings.update(kwargs)
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(settings, f, indent=2)
-    except Exception as e:
-        debug_log(f"salva_settings: {e}")
-
 STATS_DIR = os.path.expanduser("~/.local/share/pulizia-ubuntu")
 TRANSLATIONS = {
     "it": {
@@ -182,7 +123,6 @@ TRANSLATIONS = {
         "stats_reset_confirm": "Vuoi davvero azzerare tutte le statistiche?",
         "stats_date": "Data",
         "stats_freed": "Liberato",
-        "theme_label": "🎨 Tema:",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -345,7 +285,6 @@ TRANSLATIONS = {
         "stats_reset_confirm": "Really reset all statistics?",
         "stats_date": "Date",
         "stats_freed": "Freed",
-        "theme_label": "🎨 Theme:",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -574,18 +513,6 @@ def _rileva_lingua():
 CURRENT_LANG = _rileva_lingua()
 
 
-# Tema corrente (dal settings o default dark)
-_settings_iniziali = carica_settings()
-CURRENT_THEME = _settings_iniziali.get("theme") or "dark"
-if _settings_iniziali.get("lang"):
-    CURRENT_LANG = _settings_iniziali["lang"]
-
-
-def T(key):
-    """Ritorna il colore del tema corrente."""
-    return THEMES[CURRENT_THEME][key]
-
-
 def _(key, *args):
     testo = TRANSLATIONS.get(CURRENT_LANG, TRANSLATIONS["en"]).get(key, key)
     if args:
@@ -610,7 +537,7 @@ class PuliziaApp:
         self.root.title(f"{APP_NAME} {APP_VERSION}")
         self.root.geometry("820x780+80+40")
         self.root.minsize(760, 660)
-        self.root.configure(bg=T("bg"))
+        self.root.configure(bg="#2c3e50")
 
         self.report_lines = []
         self.spazio_prima = 0
@@ -675,13 +602,13 @@ class PuliziaApp:
                     continue
 
     def _build_ui(self):
-        header = tk.Frame(self.root, bg=T("bg"))
+        header = tk.Frame(self.root, bg="#2c3e50")
         header.pack(fill=tk.X, pady=(10, 0))
 
-        frame_lang = tk.Frame(header, bg=T("bg"))
+        frame_lang = tk.Frame(header, bg="#2c3e50")
         frame_lang.pack(side=tk.RIGHT, padx=15)
         tk.Label(frame_lang, text=_("lang_label"), font=("Ubuntu", 9),
-                 bg=T("bg"), fg=T("fg_muted")).pack(side=tk.LEFT)
+                 bg="#2c3e50", fg="#95a5a6").pack(side=tk.LEFT)
         self.lang_var = tk.StringVar(value=CURRENT_LANG)
         lang_combo = ttk.Combobox(frame_lang, textvariable=self.lang_var,
                                   state="readonly", width=4,
@@ -689,50 +616,38 @@ class PuliziaApp:
         lang_combo.pack(side=tk.LEFT, padx=4)
         lang_combo.bind("<<ComboboxSelected>>", self._cambia_lingua)
 
-        # Selettore tema
-        frame_theme = tk.Frame(header, bg=T("bg"))
-        frame_theme.pack(side=tk.RIGHT, padx=15)
-        tk.Label(frame_theme, text=_("theme_label"), font=("Ubuntu", 9),
-                 bg=T("bg"), fg=T("fg_muted")).pack(side=tk.LEFT)
-        self.theme_var = tk.StringVar(value=CURRENT_THEME)
-        theme_combo = ttk.Combobox(
-            frame_theme, textvariable=self.theme_var, state="readonly",
-            width=6, values=["dark", "light"], font=("Ubuntu", 9))
-        theme_combo.pack(side=tk.LEFT, padx=4)
-        theme_combo.bind("<<ComboboxSelected>>", self._cambia_tema)
-
         self.lbl_titolo = tk.Label(header, text=_("app_title"),
                                    font=("Ubuntu", 20, "bold"),
-                                   bg=T("bg"), fg=T("fg"))
+                                   bg="#2c3e50", fg="#ecf0f1")
         self.lbl_titolo.pack()
         self.lbl_sottotitolo = tk.Label(
             self.root, text=f"{_('subtitle')}  |  v{APP_VERSION}",
             font=("Ubuntu", 10, "italic"),
-            bg=T("bg"), fg=T("fg_muted"))
+            bg="#2c3e50", fg="#95a5a6")
         self.lbl_sottotitolo.pack(pady=(2, 6))
 
         self.frame_opt = tk.LabelFrame(
             self.root, text=_("options_title"),
             font=("Ubuntu", 10, "bold"),
-            bg=T("bg_widget"), fg=T("fg"), bd=2, relief="groove")
+            bg="#34495e", fg="#ecf0f1", bd=2, relief="groove")
         self.frame_opt.pack(fill=tk.X, padx=20, pady=6)
 
         self.checkbuttons = {}
 
         # Browser master
-        frame_browsers = tk.Frame(self.frame_opt, bg=T("bg_widget"))
+        frame_browsers = tk.Frame(self.frame_opt, bg="#34495e")
         frame_browsers.pack(fill=tk.X, padx=10, pady=2)
         cb_all = tk.Checkbutton(
             frame_browsers, text=_("opt_browser"),
             variable=self.var_browser_all,
             font=("Ubuntu", 10, "bold"),
-            bg=T("bg_widget"), fg=T("fg"), selectcolor=T("select_bg"),
+            bg="#34495e", fg="#ecf0f1", selectcolor="#2c3e50",
             activebackground="#34495e", activeforeground="#1abc9c",
             anchor="w", command=self._toggle_all_browsers)
         cb_all.pack(fill=tk.X)
         self.checkbuttons["opt_browser"] = cb_all
 
-        frame_sub = tk.Frame(self.frame_opt, bg=T("bg_widget"))
+        frame_sub = tk.Frame(self.frame_opt, bg="#34495e")
         frame_sub.pack(fill=tk.X, padx=10, pady=(0, 4))
         self.browser_vars = {
             "chrome": self.var_chrome,
@@ -747,7 +662,7 @@ class PuliziaApp:
             cb = tk.Checkbutton(
                 frame_sub, text=nome.capitalize(),
                 variable=var, font=("Ubuntu", 9),
-                bg=T("bg_widget"), fg=T("fg"), selectcolor=T("select_bg"),
+                bg="#34495e", fg="#ecf0f1", selectcolor="#2c3e50",
                 activebackground="#34495e", activeforeground="#1abc9c",
                 anchor="w", command=self._sync_master_browser)
             cb.grid(row=r, column=c, sticky="w", padx=15, pady=1)
@@ -762,15 +677,15 @@ class PuliziaApp:
                          ("opt_kernels", self.var_kernels)]:
             cb = tk.Checkbutton(self.frame_opt, text=_(key), variable=var,
                                 font=("Ubuntu", 10),
-                                bg=T("bg_widget"), fg=T("fg"),
-                                selectcolor=T("select_bg"),
+                                bg="#34495e", fg="#ecf0f1",
+                                selectcolor="#2c3e50",
                                 activebackground="#34495e",
                                 activeforeground="#1abc9c", anchor="w")
             cb.pack(fill=tk.X, padx=10, pady=2)
             self.checkbuttons[key] = cb
 
         # Pulsanti
-        frame_btn = tk.Frame(self.root, bg=T("bg"))
+        frame_btn = tk.Frame(self.root, bg="#2c3e50")
         frame_btn.pack(pady=6)
 
         self.btn_esegui = self._crea_pulsante(frame_btn, _("btn_run"),
@@ -808,15 +723,15 @@ class PuliziaApp:
 
         self.lbl_stato = tk.Label(self.root, text=_("status_ready"),
                                   font=("Ubuntu", 10),
-                                  bg=T("bg"), fg=T("accent"))
+                                  bg="#2c3e50", fg="#f39c12")
         self.lbl_stato.pack(pady=4)
 
-        frame_head = tk.Frame(self.root, bg=T("bg"))
+        frame_head = tk.Frame(self.root, bg="#2c3e50")
         frame_head.pack(fill=tk.X, padx=20, pady=(6, 0))
 
         self.lbl_report = tk.Label(frame_head, text=_("report_label"),
                                    font=("Ubuntu", 11, "bold"),
-                                   bg=T("bg"), fg=T("fg"))
+                                   bg="#2c3e50", fg="#ecf0f1")
         self.lbl_report.pack(side=tk.LEFT)
 
         self.btn_salva = tk.Button(frame_head, text=_("btn_save"),
@@ -833,7 +748,7 @@ class PuliziaApp:
 
         self.txt_report = scrolledtext.ScrolledText(
             self.root, wrap=tk.WORD, width=90, height=12,
-            font=("Ubuntu Mono", 9), bg=T("bg_text"), fg=T("fg"),
+            font=("Ubuntu Mono", 9), bg="#1c2833", fg="#ecf0f1",
             insertbackground="white", relief="flat", state=tk.DISABLED)
         self.txt_report.pack(padx=20, pady=(5, 12), fill=tk.BOTH, expand=True)
 
@@ -851,37 +766,6 @@ class PuliziaApp:
     def _sync_master_browser(self):
         tutti_attivi = all(v.get() for v in self.browser_vars.values())
         self.var_browser_all.set(tutti_attivi)
-
-    def _cambia_tema(self, event=None):
-        """Cambia il tema e ricostruisce l'interfaccia."""
-        global CURRENT_THEME
-        CURRENT_THEME = self.theme_var.get()
-        salva_settings(theme=CURRENT_THEME)
-        debug_log(f"Tema cambiato: {CURRENT_THEME}")
-        self._refresh_tema()
-
-    def _refresh_tema(self):
-        """Riapplica il tema a tutti i widget."""
-        # Distruggi e ricrea l'interfaccia
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        # Reset stato
-        self.report_lines_backup = list(self.report_lines)
-
-        # Ricostruisci
-        self._build_ui()
-        self.root.configure(bg=T("bg"))
-
-        # Ripristina report
-        if self.report_lines_backup:
-            self.txt_report.config(state=tk.NORMAL)
-            self.txt_report.insert(tk.END,
-                                   "\n".join(self.report_lines_backup) + "\n")
-            self.txt_report.see(tk.END)
-            self.txt_report.config(state=tk.DISABLED)
-            self.btn_salva.config(state=tk.NORMAL)
-            self.btn_copia.config(state=tk.NORMAL)
 
     def _cambia_lingua(self, event=None):
         global CURRENT_LANG
@@ -946,7 +830,7 @@ class PuliziaApp:
         win = tk.Toplevel(self.root)
         win.title(_("graph_title"))
         win.geometry("700x500")
-        win.configure(bg=T("bg"))
+        win.configure(bg="#2c3e50")
         win.transient(self.root)
 
         usato_prima = totale - prima
@@ -1077,7 +961,7 @@ class PuliziaApp:
         dialog = tk.Toplevel(self.root)
         dialog.title(_("pwd_title"))
         dialog.geometry("440x230")
-        dialog.configure(bg=T("bg"))
+        dialog.configure(bg="#2c3e50")
         dialog.transient(self.root)
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -1087,17 +971,17 @@ class PuliziaApp:
         dialog.geometry(f"+{x}+{y}")
 
         tk.Label(dialog, text=_("pwd_title"), font=("Ubuntu", 13, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(15, 5))
+                 bg="#2c3e50", fg="#ecf0f1").pack(pady=(15, 5))
         tk.Label(dialog, text=_("pwd_msg"), font=("Ubuntu", 9),
-                 bg=T("bg"), fg=T("fg_muted"),
+                 bg="#2c3e50", fg="#95a5a6",
                  justify="center").pack(pady=(0, 10))
 
-        fi = tk.Frame(dialog, bg=T("bg"))
+        fi = tk.Frame(dialog, bg="#2c3e50")
         fi.pack(pady=5)
         tk.Label(fi, text=_("pwd_key"), font=("Ubuntu", 14),
-                 bg=T("bg"), fg=T("accent")).pack(side=tk.LEFT, padx=(0, 5))
+                 bg="#2c3e50", fg="#f39c12").pack(side=tk.LEFT, padx=(0, 5))
         entry = tk.Entry(fi, show="●", font=("Ubuntu", 12), width=25,
-                         bg=T("bg_text"), fg=T("fg"), insertbackground="white",
+                         bg="#1c2833", fg="#ecf0f1", insertbackground="white",
                          relief="flat", bd=5)
         entry.pack(side=tk.LEFT)
         entry.focus_set()
@@ -1111,7 +995,7 @@ class PuliziaApp:
 
         entry.bind("<Return>", ok)
 
-        fb = tk.Frame(dialog, bg=T("bg"))
+        fb = tk.Frame(dialog, bg="#2c3e50")
         fb.pack(pady=15)
         tk.Button(fb, text=_("pwd_confirm"), font=("Ubuntu", 10, "bold"),
                   bg="#27ae60", fg="white", relief="flat", width=12,
@@ -1532,21 +1416,21 @@ class PuliziaApp:
         win = tk.Toplevel(self.root)
         win.title(_("disk_title"))
         win.geometry("660x580")
-        win.configure(bg=T("bg"))
+        win.configure(bg="#2c3e50")
         win.transient(self.root)
 
         tk.Label(win, text=_("disk_title"), font=("Ubuntu", 15, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 5))
+                 bg="#2c3e50", fg="#ecf0f1").pack(pady=(12, 5))
         lbl_stato = tk.Label(win, text=_("disk_analyzing"),
                              font=("Ubuntu", 10, "italic"),
-                             bg=T("bg"), fg=T("accent"))
+                             bg="#2c3e50", fg="#f39c12")
         lbl_stato.pack(pady=4)
 
-        frame_txt = tk.Frame(win, bg=T("bg"))
+        frame_txt = tk.Frame(win, bg="#2c3e50")
         frame_txt.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
 
         txt = tk.Text(frame_txt, wrap=tk.NONE, font=("Ubuntu Mono", 9),
-                      bg=T("bg_text"), fg=T("fg"), relief="flat")
+                      bg="#1c2833", fg="#ecf0f1", relief="flat")
         txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sb = tk.Scrollbar(frame_txt, command=txt.yview, width=12,
                           relief="flat", bd=0)
@@ -1597,7 +1481,7 @@ class PuliziaApp:
             txt.insert(tk.END, "-" * 60 + "\n")
             txt.insert(tk.END, f"{_('disk_total'):<45} "
                                f"{self._bytes_a_human(totale):>12}\n")
-            lbl_stato.config(text=_("disk_done"), fg=T("success"))
+            lbl_stato.config(text=_("disk_done"), fg="#2ecc71")
 
         threading.Thread(target=analizza, daemon=True).start()
         tk.Button(win, text=_("disk_close"), font=("Ubuntu", 10, "bold"),
@@ -1650,16 +1534,16 @@ class PuliziaApp:
         win = tk.Toplevel(self.root)
         win.title(_("stats_title"))
         win.geometry("900x650")
-        win.configure(bg=T("bg"))
+        win.configure(bg="#2c3e50")
         win.transient(self.root)
 
         tk.Label(win, text=_("stats_title"), font=("Ubuntu", 15, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 6))
+                 bg="#2c3e50", fg="#ecf0f1").pack(pady=(12, 6))
 
         if not pulizie:
             tk.Label(win, text=_("stats_no_data"),
                      font=("Ubuntu", 12),
-                     bg=T("bg"), fg=T("fg_muted"),
+                     bg="#2c3e50", fg="#95a5a6",
                      justify="center").pack(expand=True, pady=50)
             tk.Button(win, text=_("stats_close"), font=("Ubuntu", 10, "bold"),
                       bg="#7f8c8d", fg="white", relief="flat", width=14,
@@ -1667,7 +1551,7 @@ class PuliziaApp:
             return
 
         # --- Statistiche riassuntive ---
-        frame_stats = tk.Frame(win, bg=T("bg_widget"))
+        frame_stats = tk.Frame(win, bg="#34495e")
         frame_stats.pack(fill=tk.X, padx=20, pady=8)
 
         totale = sum(p["liberato"] for p in pulizie)
@@ -1683,17 +1567,17 @@ class PuliziaApp:
             (_("stats_last"), ultima),
         ]
         for etichetta, valore in righe:
-            r = tk.Frame(frame_stats, bg=T("bg_widget"))
+            r = tk.Frame(frame_stats, bg="#34495e")
             r.pack(fill=tk.X, padx=15, pady=2)
             tk.Label(r, text=f"{etichetta}:", font=("Ubuntu", 10, "bold"),
-                     bg=T("bg_widget"), fg=T("fg_muted"),
+                     bg="#34495e", fg="#95a5a6",
                      width=25, anchor="w").pack(side=tk.LEFT)
             tk.Label(r, text=valore, font=("Ubuntu", 10),
-                     bg=T("bg_widget"), fg=T("fg"),
+                     bg="#34495e", fg="#ecf0f1",
                      anchor="w").pack(side=tk.LEFT)
 
         # --- Grafico ---
-        frame_graph = tk.Frame(win, bg=T("bg"))
+        frame_graph = tk.Frame(win, bg="#2c3e50")
         frame_graph.pack(fill=tk.BOTH, expand=True, padx=20, pady=8)
 
         try:
@@ -1734,11 +1618,11 @@ class PuliziaApp:
             canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         except ImportError:
             tk.Label(frame_graph, text=_("graph_no_mpl"),
-                     font=("Ubuntu", 10), bg=T("bg"), fg=T("accent"),
+                     font=("Ubuntu", 10), bg="#2c3e50", fg="#e67e22",
                      justify="center").pack(expand=True)
 
         # --- Pulsanti ---
-        frame_btn = tk.Frame(win, bg=T("bg"))
+        frame_btn = tk.Frame(win, bg="#2c3e50")
         frame_btn.pack(pady=10)
 
         def azzera():
@@ -1795,35 +1679,35 @@ class PuliziaApp:
     def apri_guida(self):
         win = tk.Toplevel(self.root)
         win.title(_("help_title"))
-        win.configure(bg=T("bg"))
+        win.configure(bg="#2c3e50")
         win.transient(self.root)
         win.minsize(800, 560)
 
         tk.Label(win, text=_("help_title"), font=("Ubuntu", 15, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 6))
+                 bg="#2c3e50", fg="#ecf0f1").pack(pady=(12, 6))
 
-        frame_main = tk.Frame(win, bg=T("bg"))
+        frame_main = tk.Frame(win, bg="#2c3e50")
         frame_main.pack(fill=tk.BOTH, expand=True, padx=15, pady=5)
 
-        frame_index = tk.Frame(frame_main, bg=T("bg_widget"), width=210)
+        frame_index = tk.Frame(frame_main, bg="#34495e", width=210)
         frame_index.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
         frame_index.pack_propagate(False)
         tk.Label(frame_index, text=_("help_index"),
                  font=("Ubuntu", 10, "bold"),
-                 bg=T("bg_widget"), fg=T("fg")).pack(pady=6)
+                 bg="#34495e", fg="#ecf0f1").pack(pady=6)
 
         listbox = tk.Listbox(frame_index, font=("Ubuntu", 10),
-                             bg=T("bg_text"), fg=T("fg"),
+                             bg="#1c2833", fg="#ecf0f1",
                              selectbackground="#27ae60",
                              selectforeground="white",
                              relief="flat", bd=0, highlightthickness=0,
                              activestyle="none", cursor="hand2")
         listbox.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
 
-        frame_content = tk.Frame(frame_main, bg=T("bg"))
+        frame_content = tk.Frame(frame_main, bg="#2c3e50")
         frame_content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         txt = tk.Text(frame_content, wrap=tk.WORD, font=("Ubuntu", 10),
-                      bg=T("bg_text"), fg=T("fg"),
+                      bg="#1c2833", fg="#ecf0f1",
                       insertbackground="white", relief="flat",
                       padx=15, pady=12, cursor="arrow")
         txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -1916,21 +1800,21 @@ class PuliziaApp:
         cron_file = "/etc/cron.d/pulizia-ubuntu"
         win = tk.Toplevel(self.root)
         win.title(_("sched_title"))
-        win.configure(bg=T("bg"))
+        win.configure(bg="#2c3e50")
         win.transient(self.root)
         win.grab_set()
         win.resizable(False, False)
         win.minsize(560, 620)
 
         tk.Label(win, text=_("sched_title"), font=("Ubuntu", 15, "bold"),
-                 bg=T("bg"), fg=T("fg")).pack(pady=(15, 5))
+                 bg="#2c3e50", fg="#ecf0f1").pack(pady=(15, 5))
         tk.Label(win, text=_("sched_desc"), font=("Ubuntu", 9, "italic"),
-                 bg=T("bg"), fg=T("fg_muted"),
+                 bg="#2c3e50", fg="#95a5a6",
                  justify="center").pack(pady=(0, 10))
 
         fs = tk.LabelFrame(win, text=" " + _("sched_service_title") + " ",
                            font=("Ubuntu", 10, "bold"),
-                           bg=T("bg_widget"), fg=T("fg"), bd=2, relief="groove")
+                           bg="#34495e", fg="#ecf0f1", bd=2, relief="groove")
         fs.pack(fill=tk.X, padx=20, pady=6)
 
         cron_attivo = self._cron_service_attivo()
@@ -1942,31 +1826,31 @@ class PuliziaApp:
             t_serv, c_serv = _("sched_service_inactive"), "#e74c3c"
 
         lbl_serv = tk.Label(fs, text=t_serv, font=("Ubuntu", 10, "bold"),
-                            bg=T("bg_widget"), fg=c_serv, anchor="w")
+                            bg="#34495e", fg=c_serv, anchor="w")
         lbl_serv.pack(fill=tk.X, padx=10, pady=(8, 2))
 
         voce = os.path.exists(cron_file)
         t_voce = _("sched_entry_active") if voce else _("sched_entry_inactive")
         c_voce = "#2ecc71" if voce else "#95a5a6"
         lbl_voce = tk.Label(fs, text=t_voce, font=("Ubuntu", 10, "bold"),
-                            bg=T("bg_widget"), fg=c_voce, anchor="w")
+                            bg="#34495e", fg=c_voce, anchor="w")
         lbl_voce.pack(fill=tk.X, padx=10, pady=(2, 8))
 
-        fb = tk.Frame(fs, bg=T("bg_widget"))
+        fb = tk.Frame(fs, bg="#34495e")
         fb.pack(pady=(0, 10), padx=10, fill=tk.X)
 
         def agg_stato():
             a = self._cron_service_attivo()
             if a is None:
-                lbl_serv.config(text=_("sched_service_unknown"), fg=T("accent"))
+                lbl_serv.config(text=_("sched_service_unknown"), fg="#e67e22")
             elif a:
-                lbl_serv.config(text=_("sched_service_active"), fg=T("success"))
+                lbl_serv.config(text=_("sched_service_active"), fg="#2ecc71")
             else:
-                lbl_serv.config(text=_("sched_service_inactive"), fg=T("error"))
+                lbl_serv.config(text=_("sched_service_inactive"), fg="#e74c3c")
             if os.path.exists(cron_file):
-                lbl_voce.config(text=_("sched_entry_active"), fg=T("success"))
+                lbl_voce.config(text=_("sched_entry_active"), fg="#2ecc71")
             else:
-                lbl_voce.config(text=_("sched_entry_inactive"), fg=T("fg_muted"))
+                lbl_voce.config(text=_("sched_entry_inactive"), fg="#95a5a6")
             btn_en.config(state=tk.NORMAL if a is False else tk.DISABLED)
             btn_di.config(state=tk.NORMAL if a is True else tk.DISABLED)
 
@@ -2013,17 +1897,17 @@ class PuliziaApp:
 
         fc = tk.LabelFrame(win, text=" " + _("sched_config_title") + " ",
                            font=("Ubuntu", 10, "bold"),
-                           bg=T("bg_widget"), fg=T("fg"), bd=2, relief="groove")
+                           bg="#34495e", fg="#ecf0f1", bd=2, relief="groove")
         fc.pack(fill=tk.X, padx=20, pady=6)
-        inner = tk.Frame(fc, bg=T("bg_widget"))
+        inner = tk.Frame(fc, bg="#34495e")
         inner.pack(padx=15, pady=10, fill=tk.X)
 
         tk.Label(inner, text=_("sched_freq") + ":",
                  font=("Ubuntu", 10, "bold"),
-                 bg=T("bg_widget"), fg=T("fg")).grid(
+                 bg="#34495e", fg="#ecf0f1").grid(
             row=0, column=0, sticky="w", pady=(4, 2))
         freq_var = tk.StringVar(value="weekly")
-        ffr = tk.Frame(inner, bg=T("bg_widget"))
+        ffr = tk.Frame(inner, bg="#34495e")
         ffr.grid(row=1, column=0, columnspan=2, sticky="w", padx=20,
                  pady=(0, 8))
         for val, key in [("daily", "sched_daily"),
@@ -2031,7 +1915,7 @@ class PuliziaApp:
                          ("monthly", "sched_monthly")]:
             tk.Radiobutton(ffr, text=_(key), variable=freq_var, value=val,
                            font=("Ubuntu", 10),
-                           bg=T("bg_widget"), fg=T("fg"),
+                           bg="#34495e", fg="#ecf0f1",
                            selectcolor="#34495e",
                            activebackground="#34495e",
                            activeforeground="#1abc9c",
@@ -2039,18 +1923,18 @@ class PuliziaApp:
 
         tk.Label(inner, text=_("sched_time") + ":",
                  font=("Ubuntu", 10, "bold"),
-                 bg=T("bg_widget"), fg=T("fg")).grid(
+                 bg="#34495e", fg="#ecf0f1").grid(
             row=2, column=0, sticky="w", pady=(4, 2))
         ora_var = tk.StringVar(value="3")
         tk.Spinbox(inner, from_=0, to=23, textvariable=ora_var, width=5,
-                   font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
+                   font=("Ubuntu", 10), bg="#1c2833", fg="#ecf0f1",
                    buttonbackground="#2c3e50", relief="flat",
                    insertbackground="white").grid(
             row=2, column=1, sticky="w", padx=8, pady=(4, 2))
 
         tk.Label(inner, text=_("sched_day") + ":",
                  font=("Ubuntu", 10, "bold"),
-                 bg=T("bg_widget"), fg=T("fg")).grid(
+                 bg="#34495e", fg="#ecf0f1").grid(
             row=3, column=0, sticky="w", pady=(4, 2))
         giorni = [("0", "sched_sun"), ("1", "sched_mon"), ("2", "sched_tue"),
                   ("3", "sched_wed"), ("4", "sched_thu"), ("5", "sched_fri"),
@@ -2062,7 +1946,7 @@ class PuliziaApp:
         combo.grid(row=3, column=1, sticky="w", padx=8, pady=(4, 2))
 
         tk.Label(win, text=_("sched_note"), font=("Ubuntu", 8, "italic"),
-                 bg=T("bg"), fg=T("fg_muted"), wraplength=520,
+                 bg="#2c3e50", fg="#95a5a6", wraplength=520,
                  justify="left").pack(pady=6, padx=20)
 
         def salva():
@@ -2098,7 +1982,7 @@ class PuliziaApp:
                 return
             self._rimuovi_cron(win)
 
-        fbt = tk.Frame(win, bg=T("bg"))
+        fbt = tk.Frame(win, bg="#2c3e50")
         fbt.pack(pady=10)
         tk.Button(fbt, text=_("sched_save"), font=("Ubuntu", 10, "bold"),
                   bg="#27ae60", fg="white", relief="flat", width=14,
