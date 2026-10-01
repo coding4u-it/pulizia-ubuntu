@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "2.7"
+APP_VERSION = "2.6"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -42,42 +42,6 @@ THEMES = {
         "error":     "#c0392b",
         "select_bg": "#ffffff",
         "border":    "#bdc3c7",
-    },
-    "nord": {
-        "bg":        "#2e3440",
-        "bg_widget": "#3b4252",
-        "bg_text":   "#2e3440",
-        "fg":        "#eceff4",
-        "fg_muted":  "#d8dee9",
-        "accent":    "#88c0d0",
-        "success":   "#a3be8c",
-        "error":     "#bf616a",
-        "select_bg": "#3b4252",
-        "border":    "#4c566a",
-    },
-    "dracula": {
-        "bg":        "#282a36",
-        "bg_widget": "#44475a",
-        "bg_text":   "#1e1f29",
-        "fg":        "#f8f8f2",
-        "fg_muted":  "#6272a4",
-        "accent":    "#ffb86c",
-        "success":   "#50fa7b",
-        "error":     "#ff5555",
-        "select_bg": "#44475a",
-        "border":    "#6272a4",
-    },
-    "solarized": {
-        "bg":        "#002b36",
-        "bg_widget": "#073642",
-        "bg_text":   "#002b36",
-        "fg":        "#93a1a1",
-        "fg_muted":  "#586e75",
-        "accent":    "#b58900",
-        "success":   "#859900",
-        "error":     "#dc322f",
-        "select_bg": "#073642",
-        "border":    "#586e75",
     },
 }
 
@@ -219,7 +183,6 @@ TRANSLATIONS = {
         "stats_date": "Data",
         "stats_freed": "Liberato",
         "theme_label": "🎨 Tema:",
-        "theme_names": "dark=Scuro, light=Chiaro, nord=Nord, dracula=Dracula, solarized=Solarized",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -383,7 +346,6 @@ TRANSLATIONS = {
         "stats_date": "Date",
         "stats_freed": "Freed",
         "theme_label": "🎨 Theme:",
-        "theme_names": "dark=Dark, light=Light, nord=Nord, dracula=Dracula, solarized=Solarized",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -735,9 +697,7 @@ class PuliziaApp:
         self.theme_var = tk.StringVar(value=CURRENT_THEME)
         theme_combo = ttk.Combobox(
             frame_theme, textvariable=self.theme_var, state="readonly",
-            width=10,
-            values=["dark", "light", "nord", "dracula", "solarized"],
-            font=("Ubuntu", 9))
+            width=6, values=["dark", "light"], font=("Ubuntu", 9))
         theme_combo.pack(side=tk.LEFT, padx=4)
         theme_combo.bind("<<ComboboxSelected>>", self._cambia_tema)
 

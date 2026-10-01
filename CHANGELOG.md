@@ -3,6 +3,12 @@
 Tutte le modifiche importanti di questo progetto sono documentate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
+## [2.7] - 2026-10-01
+
+### Aggiunto
+- 🎨 3 nuovi temi: Nord, Dracula, Solarized
+- Selettore tema esteso a 5 opzioni
+
 ## [2.6] - 2026-10-01
 
 ### Aggiunto
