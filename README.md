@@ -4,7 +4,7 @@
 
 ![Anteprima](https://raw.githubusercontent.com/coding4u-it/pulizia-ubuntu/main/screenshot.png)
 
-[![Version](https://img.shields.io/badge/version-2.4-blue)](https://github.com/coding4u-it/pulizia-ubuntu)
+[![Version](https://img.shields.io/badge/version-4.2-blue)](https://github.com/coding4u-it/pulizia-ubuntu)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/coding4u-it/pulizia-ubuntu/blob/main/LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Ubuntu-orange)](https://ubuntu.com/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org/)
