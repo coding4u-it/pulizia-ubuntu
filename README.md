@@ -52,11 +52,11 @@ python3 pulizia_gui.py
 
 ```bash
 # Scarica l'ultima release dalla pagina Releases
-wget https://github.com/coding4u-it/pulizia-ubuntu/releases/latest/download/pulizia-ubuntu-2.3.deb
+wget https://github.com/coding4u-it/pulizia-ubuntu/releases/latest/download/pulizia-ubuntu-4.2.deb
 
 # Installa (con gdebi per risolvere le dipendenze)
 sudo apt install gdebi -y
-sudo gdebi pulizia-ubuntu-2.3.deb
+sudo gdebi pulizia-ubuntu-4.2.deb
 ```
 
 ---
