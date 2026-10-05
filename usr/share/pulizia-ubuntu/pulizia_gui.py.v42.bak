@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "5.0"
+APP_VERSION = "4.2"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -287,23 +287,6 @@ TRANSLATIONS = {
         "final_no_change": "ℹ️  Nessuna variazione significativa",
         "final_used": "⚠️  {0} occupati (attività di sistema)",
         "final_close": "✔  Chiudi",
-        "opt_dev_cache": "Pulizia cache sviluppatori (pip, npm, cargo, gem, composer, go)",
-        "opt_multimedia": "Pulizia cache multimedia (Thunderbird, Spotify, VLC...)",
-        "opt_steam": "Pulizia cache Steam (shader, download, log)",
-        "opt_symlinks": "Rimozione link simbolici rotti",
-        "opt_emptydirs": "Rimozione cartelle vuote (solo home)",
-        "step_dev_cache": "[18] Pulizia cache sviluppatori...",
-        "step_multimedia": "[19] Pulizia cache multimedia...",
-        "step_steam": "[20] Pulizia cache Steam...",
-        "step_symlinks": "[21] Rimozione link simbolici rotti...",
-        "step_emptydirs": "[22] Rimozione cartelle vuote...",
-        "dev_cache_none": "ℹ️  Nessuno strumento di sviluppo trovato",
-        "multimedia_none": "ℹ️  Nessuna cache multimedia trovata",
-        "steam_none": "ℹ️  Steam non installato",
-        "symlinks_none": "ℹ️  Nessun link simbolico rotto",
-        "symlinks_found": "Trovati {0} link simbolici rotti",
-        "emptydirs_none": "ℹ️  Nessuna cartella vuota",
-        "emptydirs_found": "Trovate {0} cartelle vuote",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -535,23 +518,6 @@ TRANSLATIONS = {
         "final_no_change": "ℹ️  No significant change",
         "final_used": "⚠️  {0} used (system activity)",
         "final_close": "✔  Close",
-        "opt_dev_cache": "Developer cache cleanup (pip, npm, cargo, gem, composer, go)",
-        "opt_multimedia": "Multimedia cache cleanup (Thunderbird, Spotify, VLC...)",
-        "opt_steam": "Steam cache cleanup (shader, download, logs)",
-        "opt_symlinks": "Remove broken symlinks",
-        "opt_emptydirs": "Remove empty directories (home only)",
-        "step_dev_cache": "[18] Developer cache cleanup...",
-        "step_multimedia": "[19] Multimedia cache cleanup...",
-        "step_steam": "[20] Steam cache cleanup...",
-        "step_symlinks": "[21] Remove broken symlinks...",
-        "step_emptydirs": "[22] Remove empty directories...",
-        "dev_cache_none": "ℹ️  No dev tools found",
-        "multimedia_none": "ℹ️  No multimedia cache found",
-        "steam_none": "ℹ️  Steam not installed",
-        "symlinks_none": "ℹ️  No broken symlinks",
-        "symlinks_found": "Found {0} broken symlinks",
-        "emptydirs_none": "ℹ️  No empty directories",
-        "emptydirs_found": "Found {0} empty directories",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -845,11 +811,6 @@ class PuliziaApp:
         self.var_docker = tk.BooleanVar(value=False)
         self.var_trim = tk.BooleanVar(value=False)
         self.var_recent = tk.BooleanVar(value=True)
-        self.var_dev_cache = tk.BooleanVar(value=True)
-        self.var_multimedia = tk.BooleanVar(value=True)
-        self.var_steam = tk.BooleanVar(value=False)
-        self.var_symlinks = tk.BooleanVar(value=False)
-        self.var_emptydirs = tk.BooleanVar(value=False)
         self.var_apt_deborphan = tk.BooleanVar(value=False)
         self.var_apt_lists = tk.BooleanVar(value=False)
         self.var_kernels = tk.BooleanVar(value=False)
@@ -989,9 +950,7 @@ class PuliziaApp:
                          ("opt_thumb", self.var_thumbnails),
                          ("opt_trash", self.var_trash),
                          ("opt_apt_purge", self.var_apt_purge),
-                         ("opt_recent", self.var_recent),
-                         ("opt_dev_cache", self.var_dev_cache),
-                         ("opt_multimedia", self.var_multimedia)]:
+                         ("opt_recent", self.var_recent)]:
             cb = tk.Checkbutton(
                 self.gruppo_sistema, text=_(key), variable=var,
                 font=("Ubuntu", 10),
@@ -1012,9 +971,6 @@ class PuliziaApp:
                          ("opt_flatpak", self.var_flatpak),
                          ("opt_docker", self.var_docker),
                          ("opt_trim", self.var_trim),
-                         ("opt_steam", self.var_steam),
-                         ("opt_symlinks", self.var_symlinks),
-                         ("opt_emptydirs", self.var_emptydirs),
                          ("opt_kernels", self.var_kernels)]:
             cb = tk.Checkbutton(
                 self.gruppo_avanzate, text=_(key), variable=var,
@@ -1616,18 +1572,8 @@ class PuliziaApp:
                 passi.append((_("step_docker"), "DOCKER"))
             if self.var_trim.get():
                 passi.append((_("step_trim"), "TRIM"))
-            if self.var_steam.get():
-                passi.append((_("step_steam"), "STEAM"))
-            if self.var_symlinks.get():
-                passi.append((_("step_symlinks"), "SYMLINKS"))
-            if self.var_emptydirs.get():
-                passi.append((_("step_emptydirs"), "EMPTYDIRS"))
             if self.var_recent.get():
                 passi.append((_("step_recent"), "RECENT"))
-            if self.var_dev_cache.get():
-                passi.append((_("step_dev_cache"), "DEV_CACHE"))
-            if self.var_multimedia.get():
-                passi.append((_("step_multimedia"), "MULTIMEDIA"))
             if self.var_kernels.get():
                 passi.append((_("step_kernels"), "KERNELS"))
 
@@ -1660,18 +1606,8 @@ class PuliziaApp:
                     self._pulisci_docker()
                 elif cmd == "TRIM":
                     self._esegui_trim()
-                elif cmd == "STEAM":
-                    self._pulisci_steam()
-                elif cmd == "SYMLINKS":
-                    self._pulisci_symlinks()
-                elif cmd == "EMPTYDIRS":
-                    self._pulisci_emptydirs()
                 elif cmd == "RECENT":
                     self._pulisci_recently_used()
-                elif cmd == "DEV_CACHE":
-                    self._pulisci_dev_cache()
-                elif cmd == "MULTIMEDIA":
-                    self._pulisci_multimedia()
                 elif cmd == "KERNELS":
                     self._gestisci_kernel()
                 else:
@@ -2452,258 +2388,6 @@ class PuliziaApp:
                 self.btn_shred_dir.config(state=tk.NORMAL)
             except Exception:
                 pass
-
-    def _pulisci_dev_cache(self):
-        """Pulisce le cache degli strumenti di sviluppo."""
-        home = os.path.expanduser("~")
-        totale = 0
-
-        # --- pip ---
-        if shutil.which("pip") or shutil.which("pip3"):
-            pip_cmd = "pip" if shutil.which("pip") else "pip3"
-            ok, out = self._esegui_comando(f"{pip_cmd} cache purge 2>&1",
-                                          timeout=120)
-            if ok:
-                self._log(f"   ✅ pip cache")
-                totale += 1
-            else:
-                self._log(f"   -- pip: non disponibile")
-
-        # --- npm ---
-        if shutil.which("npm"):
-            ok, out = self._esegui_comando(
-                "npm cache clean --force 2>&1", timeout=180)
-            if ok:
-                self._log(f"   ✅ npm cache")
-                totale += 1
-
-        # --- yarn ---
-        if shutil.which("yarn"):
-            ok, out = self._esegui_comando(
-                "yarn cache clean 2>&1", timeout=180)
-            if ok:
-                self._log(f"   ✅ yarn cache")
-                totale += 1
-
-        # --- cargo ---
-        if shutil.which("cargo"):
-            # Prova con cargo-cache, altrimenti rimuovi manualmente
-            if shutil.which("cargo-cache"):
-                ok, out = self._esegui_comando(
-                    "cargo cache -a 2>&1", timeout=300)
-                if ok:
-                    self._log(f"   ✅ cargo cache")
-                    totale += 1
-            else:
-                cargo_dir = f"{home}/.cargo/registry/cache"
-                if os.path.exists(cargo_dir):
-                    try:
-                        shutil.rmtree(cargo_dir)
-                        os.makedirs(cargo_dir, exist_ok=True)
-                        self._log(f"   ✅ cargo registry cache")
-                        totale += 1
-                    except Exception:
-                        pass
-
-        # --- gem ---
-        if shutil.which("gem"):
-            ok, out = self._esegui_comando("gem cleanup 2>&1", timeout=180)
-            if ok:
-                self._log(f"   ✅ gem cleanup")
-                totale += 1
-
-        # --- composer ---
-        if shutil.which("composer"):
-            ok, out = self._esegui_comando(
-                "composer clear-cache 2>&1", timeout=120)
-            if ok:
-                self._log(f"   ✅ composer cache")
-                totale += 1
-
-        # --- go ---
-        if shutil.which("go"):
-            ok, out = self._esegui_comando(
-                "go clean -modcache 2>&1", timeout=300)
-            if ok:
-                self._log(f"   ✅ go modcache")
-                totale += 1
-
-        if totale == 0:
-            self._log(f"   {_('dev_cache_none')}")
-
-    def _pulisci_multimedia(self):
-        """Pulisce cache di player e client multimediali."""
-        home = os.path.expanduser("~")
-        percorsi = {
-            "Thunderbird": [
-                f"{home}/.cache/thunderbird",
-                f"{home}/.thunderbird/*/ImapMail/*/INBOX.msf",
-            ],
-            "Spotify": [
-                f"{home}/.cache/spotify",
-                f"{home}/.config/spotify/Users/*/Cache",
-            ],
-            "VLC": [
-                f"{home}/.cache/vlc",
-            ],
-            "MPV": [
-                f"{home}/.cache/mpv",
-            ],
-            "Rhythmbox": [
-                f"{home}/.cache/rhythmbox",
-            ],
-            "Totem": [
-                f"{home}/.cache/totem",
-            ],
-            "digiKam": [
-                f"{home}/.cache/digikam",
-            ],
-            "Shotwell": [
-                f"{home}/.cache/shotwell",
-            ],
-            "gThumb": [
-                f"{home}/.cache/gthumb",
-                f"{home}/.local/share/gthumb",
-            ],
-            "Cheese": [
-                f"{home}/.cache/cheese",
-            ],
-        }
-
-        totale = 0
-        for nome, lista in percorsi.items():
-            rimossi = 0
-            for pat in lista:
-                for p in glob.glob(pat):
-                    if os.path.exists(p):
-                        try:
-                            if os.path.isdir(p):
-                                shutil.rmtree(p, ignore_errors=True)
-                                try:
-                                    os.makedirs(p, exist_ok=True)
-                                except Exception:
-                                    pass
-                            else:
-                                os.remove(p)
-                            rimossi += 1
-                        except Exception:
-                            pass
-            if rimossi:
-                self._log(f"   ✅ {nome}: {rimossi}")
-                totale += rimossi
-
-        if totale == 0:
-            self._log(f"   {_('multimedia_none')}")
-
-    def _pulisci_steam(self):
-        """Pulisce le cache shader e di download di Steam."""
-        home = os.path.expanduser("~")
-        percorsi = [
-            f"{home}/.steam/steam/steamapps/shadercache",
-            f"{home}/.local/share/Steam/steamapps/shadercache",
-            f"{home}/.steam/steam/steamapps/downloading",
-            f"{home}/.local/share/Steam/steamapps/downloading",
-            f"{home}/.steam/steam/appcache/httpcache",
-            f"{home}/.local/share/Steam/appcache/httpcache",
-            f"{home}/.steam/steam/logs",
-            f"{home}/.local/share/Steam/logs",
-            f"{home}/.steam/steam/steamapps/temp",
-            f"{home}/.local/share/Steam/steamapps/temp",
-        ]
-
-        trovato = False
-        for p in percorsi:
-            if os.path.exists(p):
-                trovato = True
-                try:
-                    for elemento in os.listdir(p):
-                        full = os.path.join(p, elemento)
-                        try:
-                            if os.path.isdir(full):
-                                shutil.rmtree(full, ignore_errors=True)
-                            else:
-                                os.remove(full)
-                        except Exception:
-                            pass
-                    self._log(f"   ✅ {p}")
-                except Exception as e:
-                    self._log(f"   ⚠️  {p}: {e}")
-
-        if not trovato:
-            self._log(f"   {_('steam_none')}")
-
-    def _pulisci_symlinks(self):
-        """Rimuove i link simbolici rotti nella home."""
-        home = os.path.expanduser("~")
-
-        # Trova symlink rotti
-        r = subprocess.run(
-            f'find {home} -xtype l 2>/dev/null | head -500',
-            shell=True, capture_output=True, text=True, timeout=120)
-
-        rotti = [l.strip() for l in (r.stdout or "").split("\n") if l.strip()]
-
-        if not rotti:
-            self._log(f"   {_('symlinks_none')}")
-            return
-
-        self._log(f"   {_('symlinks_found', len(rotti))}")
-
-        rimossi = 0
-        for link in rotti:
-            try:
-                os.remove(link)
-                rimossi += 1
-            except Exception:
-                pass
-
-        self._log(f"   ✅ {rimossi} link rimossi")
-
-    def _pulisci_emptydirs(self):
-        """Rimuove le cartelle vuote nella home (escluse quelle di sistema)."""
-        home = os.path.expanduser("~")
-
-        # Escludi le directory di sistema critiche
-        esclusioni = [
-            ".cache", ".config", ".local", ".ssh", ".gnome",
-            ".mozilla", ".thunderbird", "snap", ".steam",
-            ".cargo", ".npm", ".gradle", ".m2", ".gem",
-        ]
-
-        # Trova cartelle vuote escludendo quelle di sistema
-        cmd = f'find {home} -mindepth 1 -type d -empty 2>/dev/null'
-        r = subprocess.run(cmd, shell=True, capture_output=True,
-                           text=True, timeout=120)
-
-        vuote = [l.strip() for l in (r.stdout or "").split("\n") if l.strip()]
-
-        # Filtra quelle di sistema
-        filtrate = []
-        for d in vuote:
-            # Salta se contiene una directory di sistema
-            if any(f"/{exc}" in d for exc in esclusioni):
-                continue
-            filtrate.append(d)
-
-        # Rimuovi solo se non rischioso (evita prime 2 settimane)
-        if not filtrate:
-            self._log(f"   {_('emptydirs_none')}")
-            return
-
-        self._log(f"   {_('emptydirs_found', len(filtrate))}")
-
-        # Rimuovi dal più profondo per evitare errori
-        filtrate.sort(key=lambda x: -x.count("/"))
-
-        rimossi = 0
-        for d in filtrate:
-            try:
-                os.rmdir(d)
-                rimossi += 1
-            except Exception:
-                pass
-
-        self._log(f"   ✅ {rimossi} cartelle rimosse")
 
     def analizza_disco(self):
         win = tk.Toplevel(self.root)

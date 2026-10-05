@@ -3,6 +3,20 @@
 Tutte le modifiche importanti di questo progetto sono documentate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it/1.0.0/).
 
+## [5.0] - 2026-10-05
+
+### Aggiunto
+- 💻 Pulizia cache sviluppatori (pip, npm, yarn, cargo, gem, composer, go)
+- 🎬 Pulizia cache multimedia (Thunderbird, Spotify, VLC, MPV, ...)
+- 🎮 Pulizia cache Steam (shader, download, log)
+- 🔗 Rimozione link simbolici rotti
+- 🗂 Rimozione cartelle vuote (escluse quelle di sistema)
+- 22 operazioni di pulizia totali
+
+### Sicurezza
+- Steam e cartelle vuote disattivati di default
+- Cartelle vuote escludono directory di sistema
+
 ## [4.2] - 2026-10-01
 
 ### Modificato
