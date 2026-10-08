@@ -1,5 +1,7 @@
 # 🧹 Pulizia Ubuntu
 
+> 🌍 [Read this in English](README.en.md)
+
 <div align="center">
 
 ![Anteprima](https://raw.githubusercontent.com/coding4u-it/pulizia-ubuntu/main/screenshot.png)
