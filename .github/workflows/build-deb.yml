@@ -25,7 +25,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev imagemagick
+          sudo apt-get install -y dpkg-dev
           pip install Pillow
 
       - name: Generate icons
@@ -136,8 +136,7 @@ jobs:
 
       - name: Upload .deb to release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: pulizia-ubuntu-*.deb
+        run: |
+          gh release upload ${{ github.ref_name }} pulizia-ubuntu-*.deb --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
