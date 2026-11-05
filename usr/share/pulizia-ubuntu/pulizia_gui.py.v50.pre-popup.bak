@@ -1,0 +1,3421 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Pulizia Ubuntu v2.5 - Pulizia APT avanzata."""
+
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext, filedialog
+import subprocess, threading, os, shutil, tempfile, glob, queue, json
+from datetime import datetime
+
+APP_NAME = "Pulizia Ubuntu"
+APP_VERSION = "5.0"
+LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
+STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
+
+# ======================================================================
+# TEMI E SETTINGS
+# ======================================================================
+SETTINGS_DIR = os.path.expanduser("~/.config/pulizia-ubuntu")
+SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
+
+THEMES = {
+    "dark": {
+        "bg":        "#2c3e50",
+        "bg_widget": "#34495e",
+        "bg_text":   "#1c2833",
+        "fg":        "#ecf0f1",
+        "fg_muted":  "#95a5a6",
+        "accent":    "#f39c12",
+        "success":   "#2ecc71",
+        "error":     "#e74c3c",
+        "select_bg": "#2c3e50",
+        "border":    "#7f8c8d",
+    },
+    "light": {
+        "bg":        "#f5f6fa",
+        "bg_widget": "#ffffff",
+        "bg_text":   "#ffffff",
+        "fg":        "#2c3e50",
+        "fg_muted":  "#7f8c8d",
+        "accent":    "#e67e22",
+        "success":   "#27ae60",
+        "error":     "#c0392b",
+        "select_bg": "#ffffff",
+        "border":    "#bdc3c7",
+    },
+    "nord": {
+        "bg":        "#2e3440",
+        "bg_widget": "#3b4252",
+        "bg_text":   "#2e3440",
+        "fg":        "#eceff4",
+        "fg_muted":  "#d8dee9",
+        "accent":    "#88c0d0",
+        "success":   "#a3be8c",
+        "error":     "#bf616a",
+        "select_bg": "#3b4252",
+        "border":    "#4c566a",
+    },
+    "dracula": {
+        "bg":        "#282a36",
+        "bg_widget": "#44475a",
+        "bg_text":   "#1e1f29",
+        "fg":        "#f8f8f2",
+        "fg_muted":  "#6272a4",
+        "accent":    "#ffb86c",
+        "success":   "#50fa7b",
+        "error":     "#ff5555",
+        "select_bg": "#44475a",
+        "border":    "#6272a4",
+    },
+    "solarized": {
+        "bg":        "#002b36",
+        "bg_widget": "#073642",
+        "bg_text":   "#002b36",
+        "fg":        "#93a1a1",
+        "fg_muted":  "#586e75",
+        "accent":    "#b58900",
+        "success":   "#859900",
+        "error":     "#dc322f",
+        "select_bg": "#073642",
+        "border":    "#586e75",
+    },
+}
+
+
+def carica_settings():
+    """Carica le preferenze utente."""
+    default = {"lang": None, "theme": None}
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, encoding="utf-8") as f:
+                data = json.load(f)
+            default.update(data)
+    except Exception as e:
+        debug_log(f"carica_settings: {e}")
+    return default
+
+
+def salva_settings(**kwargs):
+    """Salva le preferenze utente."""
+    try:
+        os.makedirs(SETTINGS_DIR, exist_ok=True)
+        settings = carica_settings()
+        settings.update(kwargs)
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        debug_log(f"salva_settings: {e}")
+
+STATS_DIR = os.path.expanduser("~/.local/share/pulizia-ubuntu")
+TRANSLATIONS = {
+    "it": {
+        "app_title": "🧹 Pulizia di Sistema",
+        "subtitle": "Ubuntu 26.04 LTS - Manutenzione completa",
+        "options_title": " ⚙️  Opzioni di pulizia ",
+        "opt_browser": "Pulizia cache browser (seleziona quali)",
+        "opt_snap": "Rimozione vecchie revisioni Snap",
+        "opt_tmp": "Pulizia file temporanei (/tmp, /var/tmp)",
+        "opt_thumb": "Pulizia anteprime (thumbnails)",
+        "opt_trash": "Svuotamento cestino",
+        "opt_apt_purge": "Pulizia config orfane (apt purge rc)",
+        "opt_apt_deborphan": "Rimozione librerie orfane (deborphan)",
+        "opt_apt_lists": "Rigenerazione liste APT (/var/lib/apt/lists)",
+        "opt_kernels": "Rimozione vecchi kernel (⚠️ pericoloso)",
+        "btn_run": "▶  Esegui Pulizia",
+        "btn_schedule": "⏱  Schedula",
+        "btn_disk": "📊 Analisi disco",
+        "btn_help": "❓  Guida",
+        "btn_exit": "✖  Esci",
+        "btn_save": "💾 Salva",
+        "btn_copy": "📋 Copia",
+        "report_label": "📋 Report:",
+        "status_ready": "Pronto. Premi 'Esegui Pulizia'.",
+        "status_done": "✅ Pulizia completata!",
+        "status_error": "❌ Errore durante la pulizia",
+        "confirm_title": "Conferma",
+        "confirm_msg": "Vuoi avviare la pulizia del sistema?",
+        "pwd_title": "🔒 Password amministratore",
+        "pwd_msg": "La pulizia richiede privilegi di root.\nInserisci la password:",
+        "pwd_key": "🔑",
+        "pwd_confirm": "✔  Conferma",
+        "pwd_cancel": "✖  Annulla",
+        "pwd_wrong_title": "Password errata",
+        "pwd_wrong_msg": "Autenticazione fallita.\n\nDettaglio: {0}",
+        "pwd_timeout_title": "Timeout",
+        "pwd_timeout_msg": "sudo non ha risposto in 15 secondi.",
+        "pwd_expired_title": "Sessione scaduta",
+        "pwd_expired_msg": "La sessione sudo è scaduta.\nRiavvia la pulizia.",
+        "error_title": "Errore",
+        "done_title": "Fatto",
+        "done_msg": "Pulizia completata!\n\nSpazio liberato: {0}\nSpazio libero: {1}",
+        "save_dialog_title": "Salva report",
+        "save_ok": "Report salvato in:\n{0}",
+        "copy_ok": "Report negli appunti!",
+        "exit_title": "Esci",
+        "exit_msg": "Chiudere l'applicazione?",
+        "exit_running": "Attendi la fine della pulizia.",
+        "report_header": "REPORT PULIZIA",
+        "initial_free": "Spazio libero iniziale:",
+        "final_summary": "RIEPILOGO FINALE",
+        "final_free": "Spazio libero finale :",
+        "freed_positive": "Spazio liberato      : ✅",
+        "freed_zero": "Spazio liberato      : ℹ️  Nessuna variazione",
+        "freed_negative": "Variazione           : ⚠️  {0} occupati",
+        "completed_at": "Pulizia completata alle",
+        "step_autoremove": "[1] Pulizia pacchetti orfani...",
+        "step_apt_clean": "[2] Pulizia cache APT...",
+        "step_apt_autoclean": "[3] Pulizia cache pacchetti vecchi...",
+        "step_journal": "[4] Pulizia log systemd (ultimi 3 giorni)...",
+        "step_snap": "[5] Pulizia vecchie revisioni Snap...",
+        "step_tmp": "[6] Pulizia file temporanei...",
+        "step_browser": "[7] Pulizia cache browser...",
+        "step_thumb": "[8] Pulizia anteprime...",
+        "step_trash": "[9] Svuotamento cestino...",
+        "step_apt_purge": "[10] Pulizia config orfane (rc)...",
+        "step_apt_deborphan": "[11] Rimozione librerie orfane...",
+        "step_apt_lists": "[12] Rigenerazione liste APT...",
+        "step_kernels": "[13] Rimozione vecchi kernel...",
+        "ok": "✅ OK",
+        "snap_none": "ℹ️  Snap non installato",
+        "snap_no_rev": "✅ Nessuna revisione da rimuovere",
+        "snap_found": "Trovate {0} revisioni disabilitate",
+        "tmp_ok": "✅ file temporanei rimossi",
+        "browser_none": "ℹ️  Nessuna cache browser trovata",
+        "thumb_none": "ℹ️  Nessuna cache anteprime",
+        "thumb_ok": "✅ Anteprime rimosse",
+        "trash_ok": "✅ Cestino svuotato",
+        "trash_empty": "ℹ️  Cestino già vuoto",
+        "apt_purge_none": "ℹ️  Nessuna config orfana trovata",
+        "apt_purge_found": "Trovate {0} config orfane",
+        "apt_purge_remove": "Rimozione {0}...",
+        "apt_purge_done": "✅ {0} pacchetti purgati",
+        "apt_lists_ok": "✅ Liste APT rigenerate",
+        "apt_lists_err": "⚠️  Errore rigenerazione liste",
+        "deborphan_none": "ℹ️  deborphan non installato, salto",
+        "deborphan_ok": "✅ Librerie orfane rimosse",
+        "deborphan_found": "Trovate {0} librerie orfane",
+        "kernels_current": "Kernel attuale: {0}",
+        "kernels_found": "Trovati {0} kernel installati",
+        "kernels_remove": "Rimozione {0}...",
+        "kernels_none": "ℹ️  Nessun kernel da rimuovere",
+        "graph_title": "📊 Spazio disco prima/dopo",
+        "graph_before": "Prima",
+        "graph_after": "Dopo",
+        "graph_used": "Occupato",
+        "graph_free": "Libero",
+        "graph_no_mpl": "matplotlib non installato.\n\nInstalla con:\nsudo apt install python3-matplotlib",
+        "btn_stats": "📈 Statistiche",
+        "stats_title": "📈 Statistiche pulizie",
+        "stats_no_data": "Nessuna pulizia registrata.\n\nEsegui la prima pulizia!",
+        "stats_total": "Pulizie totali",
+        "stats_freed_total": "Spazio totale liberato",
+        "stats_avg": "Media per pulizia",
+        "stats_last": "Ultima pulizia",
+        "stats_first": "Prima pulizia",
+        "stats_chart_title": "Spazio liberato nel tempo",
+        "stats_close": "Chiudi",
+        "stats_reset": "🗑 Azzera statistiche",
+        "stats_reset_confirm": "Vuoi davvero azzerare tutte le statistiche?",
+        "stats_date": "Data",
+        "stats_freed": "Liberato",
+        "theme_label": "🎨 Tema:",
+        "theme_names": "dark=Scuro, light=Chiaro, nord=Nord, dracula=Dracula, solarized=Solarized",
+        "opt_flatpak": "Pulizia runtime Flatpak inutilizzati",
+        "opt_docker": "Pulizia Docker (container/immagini/volumi)",
+        "opt_trim": "Esecuzione TRIM su SSD",
+        "opt_recent": "Pulizia file recenti (recently-used)",
+        "step_flatpak": "[14] Pulizia Flatpak...",
+        "step_docker": "[15] Pulizia Docker...",
+        "step_trim": "[16] TRIM SSD...",
+        "step_recent": "[17] Pulizia file recenti...",
+        "flatpak_none": "ℹ️  Flatpak non installato",
+        "flatpak_ok": "✅ Runtime Flatpak inutilizzati rimossi",
+        "flatpak_err": "⚠️  Errore Flatpak",
+        "docker_none": "ℹ️  Docker non installato",
+        "docker_inactive": "ℹ️  Servizio Docker non attivo",
+        "docker_containers": "Rimozione container fermi...",
+        "docker_images": "Rimozione immagini dangling...",
+        "docker_volumes": "Rimozione volumi orfani...",
+        "docker_networks": "Rimozione reti inutilizzate...",
+        "docker_ok": "✅ Docker pulito",
+        "trim_none": "ℹ️  fstrim non disponibile",
+        "trim_timer": "Timer fstrim: {0}",
+        "trim_running": "Esecuzione TRIM (può richiedere tempo)...",
+        "trim_ok": "✅ TRIM completato",
+        "trim_err": "⚠️  Errore TRIM",
+        "recent_ok": "✅ File recenti rimossi",
+        "recent_none": "ℹ️  Nessun file recente",
+        "btn_shred": "🔐 Shred",
+        "shred_title": "🔐 Cancellazione sicura (Shred)",
+        "shred_desc": "Sovrascrive i file con dati casuali prima di eliminarli.\nIl contenuto diventa irrecuperabile, anche con software di recovery.",
+        "shred_section_file": "File singolo",
+        "shred_section_dir": "Directory completa",
+        "shred_section_opts": "Opzioni",
+        "shred_section_log": "Log operazione",
+        "shred_browse": "📁 Sfoglia",
+        "shred_browse_file_title": "Seleziona file da cancellare",
+        "shred_browse_dir_title": "Seleziona directory da cancellare",
+        "shred_passes": "Passaggi di sovrascrittura:",
+        "shred_passes_hint": "(3 raccomandato, 35 massimo)",
+        "shred_zero": "Aggiungi passaggio finale con zeri (nasconde shred)",
+        "shred_remove": "Rimuovi file dopo la sovrascrittura",
+        "shred_warning": "⚠️  ATTENZIONE: operazione IRREVERSIBILE.\nI file cancellati non potranno essere recuperati in alcun modo.",
+        "shred_btn_file": "🔐 Shred file",
+        "shred_btn_dir": "🔐 Shred directory",
+        "shred_close": "Chiudi",
+        "shred_file": "file",
+        "shred_dir": "directory",
+        "shred_no_path": "Seleziona un file o una directory.",
+        "shred_not_exists": "Il percorso non esiste: {0}",
+        "shred_not_available": "Comando shred non disponibile.\nInstalla con: sudo apt install coreutils",
+        "shred_confirm_title": "⚠️  Conferma cancellazione",
+        "shred_confirm_msg": "Stai per cancellare IRREVERSIBILMENTE:\n\nTipo: {0}\nPercorso: {1}\nElementi: {2}\nDimensione: {3}\n\nProcedere?",
+        "shred_notif_title": "🔐 Shred completato",
+        "shred_notif_msg": "{0} file cancellati in modo sicuro",
+        "btn_tools": "🔧  Strumenti  ▼",
+        "btn_help_short": "❓  Aiuto",
+        "btn_exit_short": "✖  Esci",
+        "group_browser": "Browser",
+        "group_system": "Sistema",
+        "group_advanced": "Avanzate",
+        "menu_schedule": "⏱  Schedulazione automatica",
+        "menu_disk": "📊  Analisi spazio disco",
+        "menu_stats": "📈  Statistiche pulizie",
+        "menu_shred": "🔐  Cancellazione sicura",
+        "final_title": "📋 Riepilogo pulizia",
+        "final_freed": "✅ Spazio liberato: {0}",
+        "final_no_change": "ℹ️  Nessuna variazione significativa",
+        "final_used": "⚠️  {0} occupati (attività di sistema)",
+        "final_close": "✔  Chiudi",
+        "opt_dev_cache": "Pulizia cache sviluppatori (pip, npm, cargo, gem, composer, go)",
+        "opt_multimedia": "Pulizia cache multimedia (Thunderbird, Spotify, VLC...)",
+        "opt_steam": "Pulizia cache Steam (shader, download, log)",
+        "opt_symlinks": "Rimozione link simbolici rotti",
+        "opt_emptydirs": "Rimozione cartelle vuote (solo home)",
+        "step_dev_cache": "[18] Pulizia cache sviluppatori...",
+        "step_multimedia": "[19] Pulizia cache multimedia...",
+        "step_steam": "[20] Pulizia cache Steam...",
+        "step_symlinks": "[21] Rimozione link simbolici rotti...",
+        "step_emptydirs": "[22] Rimozione cartelle vuote...",
+        "dev_cache_none": "ℹ️  Nessuno strumento di sviluppo trovato",
+        "multimedia_none": "ℹ️  Nessuna cache multimedia trovata",
+        "steam_none": "ℹ️  Steam non installato",
+        "symlinks_none": "ℹ️  Nessun link simbolico rotto",
+        "symlinks_found": "Trovati {0} link simbolici rotti",
+        "emptydirs_none": "ℹ️  Nessuna cartella vuota",
+        "emptydirs_found": "Trovate {0} cartelle vuote",
+        "lang_label": "🌍 Lingua:",
+        "notif_title": "🧹 Pulizia completata",
+        "notif_msg": "Spazio liberato: {0}",
+        "sched_title": "⏱  Schedulazione automatica",
+        "sched_desc": "Configura l'esecuzione automatica\ndella pulizia via cron.",
+        "sched_freq": "Frequenza",
+        "sched_daily": "Ogni giorno",
+        "sched_weekly": "Ogni settimana",
+        "sched_monthly": "Ogni mese (1° del mese)",
+        "sched_time": "Ora (0-23)",
+        "sched_day": "Giorno (solo weekly)",
+        "sched_sun": "Domenica",
+        "sched_mon": "Lunedì",
+        "sched_tue": "Martedì",
+        "sched_wed": "Mercoledì",
+        "sched_thu": "Giovedì",
+        "sched_fri": "Venerdì",
+        "sched_sat": "Sabato",
+        "sched_note": "⚠️  La schedulazione richiede la password sudo.",
+        "sched_save": "💾 Salva",
+        "sched_remove": "🗑  Rimuovi",
+        "sched_close": "Chiudi",
+        "sched_ok_title": "Schedulazione attiva",
+        "sched_ok_msg": "✅ Schedulazione installata!\n\nEspressione cron: {0}\n\nLog: /var/log/pulizia_ubuntu.log",
+        "sched_remove_confirm_title": "Conferma",
+        "sched_remove_confirm_msg": "Rimuovere la schedulazione automatica?",
+        "sched_removed_title": "Rimossa",
+        "sched_removed_msg": "Schedulazione rimossa con successo.",
+        "sched_err_time": "Ora non valida (0-23).",
+        "sched_service_title": "Stato del servizio cron",
+        "sched_service_active": "✅ Servizio cron ATTIVO",
+        "sched_service_inactive": "❌ Servizio cron DISATTIVATO",
+        "sched_service_unknown": "⚠️  Stato servizio non rilevato",
+        "sched_service_enable": "▶  Abilita cron",
+        "sched_service_disable": "⏹  Disabilita cron",
+        "sched_service_enabled": "Servizio cron abilitato e avviato.",
+        "sched_service_disabled": "Servizio cron disabilitato e fermato.",
+        "sched_service_disable_confirm": "Disabilitare il servizio cron?",
+        "sched_entry_active": "✅ Schedulazione Pulizia Ubuntu ATTIVA",
+        "sched_entry_inactive": "ℹ️  Nessuna schedulazione Pulizia Ubuntu",
+        "sched_config_title": "Configurazione schedulazione",
+        "help_title": "📖 Guida in linea",
+        "help_close": "Chiudi",
+        "help_index": "📑 Indice",
+        "disk_title": "📊 Analisi spazio disco",
+        "disk_analyzing": "Analisi in corso...",
+        "disk_path": "Percorso",
+        "disk_size": "Dimensione",
+        "disk_total": "TOTALE",
+        "disk_close": "Chiudi",
+        "disk_done": "Analisi completata. Directory più grandi in cima.",
+    },
+    "en": {
+        "app_title": "🧹 System Cleanup",
+        "subtitle": "Ubuntu 26.04 LTS - Safe maintenance",
+        "options_title": " ⚙️  Cleanup options ",
+        "opt_browser": "Browser cache cleanup (select which)",
+        "opt_snap": "Remove old Snap revisions",
+        "opt_tmp": "Temporary files cleanup (/tmp, /var/tmp)",
+        "opt_thumb": "Thumbnails cleanup",
+        "opt_trash": "Empty trash",
+        "opt_apt_purge": "Orphan config cleanup (apt purge rc)",
+        "opt_apt_deborphan": "Remove orphan libraries (deborphan)",
+        "opt_apt_lists": "Regenerate APT lists (/var/lib/apt/lists)",
+        "opt_kernels": "Remove old kernels (⚠️ dangerous)",
+        "btn_run": "▶  Run Cleanup",
+        "btn_schedule": "⏱  Schedule",
+        "btn_disk": "📊 Disk analysis",
+        "btn_help": "❓  Help",
+        "btn_exit": "✖  Exit",
+        "btn_save": "💾 Save",
+        "btn_copy": "📋 Copy",
+        "report_label": "📋 Report:",
+        "status_ready": "Ready. Press 'Run Cleanup'.",
+        "status_done": "✅ Cleanup completed!",
+        "status_error": "❌ Error during cleanup",
+        "confirm_title": "Confirm",
+        "confirm_msg": "Do you want to start the system cleanup?",
+        "pwd_title": "🔒 Administrator password",
+        "pwd_msg": "Cleanup requires root privileges.\nEnter your password:",
+        "pwd_key": "🔑",
+        "pwd_confirm": "✔  Confirm",
+        "pwd_cancel": "✖  Cancel",
+        "pwd_wrong_title": "Wrong password",
+        "pwd_wrong_msg": "Authentication failed.\n\nDetail: {0}",
+        "pwd_timeout_title": "Timeout",
+        "pwd_timeout_msg": "sudo didn't respond within 15 seconds.",
+        "pwd_expired_title": "Session expired",
+        "pwd_expired_msg": "The sudo session expired.\nRestart the cleanup.",
+        "error_title": "Error",
+        "done_title": "Done",
+        "done_msg": "Cleanup completed!\n\nSpace freed: {0}\nFree space: {1}",
+        "save_dialog_title": "Save report",
+        "save_ok": "Report saved to:\n{0}",
+        "copy_ok": "Report copied to clipboard!",
+        "exit_title": "Exit",
+        "exit_msg": "Close the application?",
+        "exit_running": "Wait for the cleanup to finish.",
+        "report_header": "CLEANUP REPORT",
+        "initial_free": "Initial free space:",
+        "final_summary": "FINAL SUMMARY",
+        "final_free": "Final free space   :",
+        "freed_positive": "Space freed        : ✅",
+        "freed_zero": "Space freed        : ℹ️  No significant change",
+        "freed_negative": "Change             : ⚠️  {0} used",
+        "completed_at": "Cleanup completed at",
+        "step_autoremove": "[1] Cleaning orphan packages...",
+        "step_apt_clean": "[2] Cleaning APT cache...",
+        "step_apt_autoclean": "[3] Cleaning old package cache...",
+        "step_journal": "[4] Cleaning systemd logs (last 3 days)...",
+        "step_snap": "[5] Cleaning old Snap revisions...",
+        "step_tmp": "[6] Cleaning temporary files...",
+        "step_browser": "[7] Cleaning browser caches...",
+        "step_thumb": "[8] Cleaning thumbnails...",
+        "step_trash": "[9] Emptying trash...",
+        "step_apt_purge": "[10] Cleaning orphan configs (rc)...",
+        "step_apt_deborphan": "[11] Removing orphan libraries...",
+        "step_apt_lists": "[12] Regenerating APT lists...",
+        "step_kernels": "[13] Removing old kernels...",
+        "ok": "✅ OK",
+        "snap_none": "ℹ️  Snap not installed",
+        "snap_no_rev": "✅ No revisions to remove",
+        "snap_found": "Found {0} disabled revisions",
+        "tmp_ok": "✅ temporary files removed",
+        "browser_none": "ℹ️  No browser cache found",
+        "thumb_none": "ℹ️  No thumbnail cache",
+        "thumb_ok": "✅ Thumbnails removed",
+        "trash_ok": "✅ Trash emptied",
+        "trash_empty": "ℹ️  Trash already empty",
+        "apt_purge_none": "ℹ️  No orphan configs found",
+        "apt_purge_found": "Found {0} orphan configs",
+        "apt_purge_remove": "Removing {0}...",
+        "apt_purge_done": "✅ {0} packages purged",
+        "apt_lists_ok": "✅ APT lists regenerated",
+        "apt_lists_err": "⚠️  Error regenerating lists",
+        "deborphan_none": "ℹ️  deborphan not installed, skipping",
+        "deborphan_ok": "✅ Orphan libraries removed",
+        "deborphan_found": "Found {0} orphan libraries",
+        "kernels_current": "Current kernel: {0}",
+        "kernels_found": "Found {0} installed kernels",
+        "kernels_remove": "Removing {0}...",
+        "kernels_none": "ℹ️  No kernels to remove",
+        "graph_title": "📊 Disk space before/after",
+        "graph_before": "Before",
+        "graph_after": "After",
+        "graph_used": "Used",
+        "graph_free": "Free",
+        "graph_no_mpl": "matplotlib not installed.\n\nInstall with:\nsudo apt install python3-matplotlib",
+        "btn_stats": "📈 Statistics",
+        "stats_title": "📈 Cleanup statistics",
+        "stats_no_data": "No cleanup recorded.\n\nRun your first cleanup!",
+        "stats_total": "Total cleanups",
+        "stats_freed_total": "Total space freed",
+        "stats_avg": "Average per cleanup",
+        "stats_last": "Last cleanup",
+        "stats_first": "First cleanup",
+        "stats_chart_title": "Space freed over time",
+        "stats_close": "Close",
+        "stats_reset": "🗑 Reset statistics",
+        "stats_reset_confirm": "Really reset all statistics?",
+        "stats_date": "Date",
+        "stats_freed": "Freed",
+        "theme_label": "🎨 Theme:",
+        "theme_names": "dark=Dark, light=Light, nord=Nord, dracula=Dracula, solarized=Solarized",
+        "opt_flatpak": "Clean unused Flatpak runtimes",
+        "opt_docker": "Docker cleanup (containers/images/volumes)",
+        "opt_trim": "Run SSD TRIM",
+        "opt_recent": "Clean recently-used files",
+        "step_flatpak": "[14] Flatpak cleanup...",
+        "step_docker": "[15] Docker cleanup...",
+        "step_trim": "[16] SSD TRIM...",
+        "step_recent": "[17] Recently-used cleanup...",
+        "flatpak_none": "ℹ️  Flatpak not installed",
+        "flatpak_ok": "✅ Unused Flatpak runtimes removed",
+        "flatpak_err": "⚠️  Flatpak error",
+        "docker_none": "ℹ️  Docker not installed",
+        "docker_inactive": "ℹ️  Docker service not active",
+        "docker_containers": "Removing stopped containers...",
+        "docker_images": "Removing dangling images...",
+        "docker_volumes": "Removing orphan volumes...",
+        "docker_networks": "Removing unused networks...",
+        "docker_ok": "✅ Docker cleaned",
+        "trim_none": "ℹ️  fstrim not available",
+        "trim_timer": "fstrim timer: {0}",
+        "trim_running": "Running TRIM (may take time)...",
+        "trim_ok": "✅ TRIM completed",
+        "trim_err": "⚠️  TRIM error",
+        "recent_ok": "✅ Recently-used files removed",
+        "recent_none": "ℹ️  No recently-used files",
+        "btn_shred": "🔐 Shred",
+        "shred_title": "🔐 Secure deletion (Shred)",
+        "shred_desc": "Overwrites files with random data before deleting.\nContents become unrecoverable, even with recovery software.",
+        "shred_section_file": "Single file",
+        "shred_section_dir": "Full directory",
+        "shred_section_opts": "Options",
+        "shred_section_log": "Operation log",
+        "shred_browse": "📁 Browse",
+        "shred_browse_file_title": "Select file to shred",
+        "shred_browse_dir_title": "Select directory to shred",
+        "shred_passes": "Overwrite passes:",
+        "shred_passes_hint": "(3 recommended, 35 max)",
+        "shred_zero": "Add final zero pass (hides shred)",
+        "shred_remove": "Remove files after overwrite",
+        "shred_warning": "⚠️  WARNING: IRREVERSIBLE operation.\nDeleted files cannot be recovered in any way.",
+        "shred_btn_file": "🔐 Shred file",
+        "shred_btn_dir": "🔐 Shred directory",
+        "shred_close": "Close",
+        "shred_file": "file",
+        "shred_dir": "directory",
+        "shred_no_path": "Select a file or directory.",
+        "shred_not_exists": "Path does not exist: {0}",
+        "shred_not_available": "shred command not available.\nInstall with: sudo apt install coreutils",
+        "shred_confirm_title": "⚠️  Confirm deletion",
+        "shred_confirm_msg": "You are about to IRREVERSIBLY delete:\n\nType: {0}\nPath: {1}\nItems: {2}\nSize: {3}\n\nProceed?",
+        "shred_notif_title": "🔐 Shred completed",
+        "shred_notif_msg": "{0} files securely deleted",
+        "btn_tools": "🔧  Tools  ▼",
+        "btn_help_short": "❓  Help",
+        "btn_exit_short": "✖  Exit",
+        "group_browser": "Browser",
+        "group_system": "System",
+        "group_advanced": "Advanced",
+        "menu_schedule": "⏱  Automatic scheduling",
+        "menu_disk": "📊  Disk space analysis",
+        "menu_stats": "📈  Cleanup statistics",
+        "menu_shred": "🔐  Secure deletion",
+        "final_title": "📋 Cleanup summary",
+        "final_freed": "✅ Space freed: {0}",
+        "final_no_change": "ℹ️  No significant change",
+        "final_used": "⚠️  {0} used (system activity)",
+        "final_close": "✔  Close",
+        "opt_dev_cache": "Developer cache cleanup (pip, npm, cargo, gem, composer, go)",
+        "opt_multimedia": "Multimedia cache cleanup (Thunderbird, Spotify, VLC...)",
+        "opt_steam": "Steam cache cleanup (shader, download, logs)",
+        "opt_symlinks": "Remove broken symlinks",
+        "opt_emptydirs": "Remove empty directories (home only)",
+        "step_dev_cache": "[18] Developer cache cleanup...",
+        "step_multimedia": "[19] Multimedia cache cleanup...",
+        "step_steam": "[20] Steam cache cleanup...",
+        "step_symlinks": "[21] Remove broken symlinks...",
+        "step_emptydirs": "[22] Remove empty directories...",
+        "dev_cache_none": "ℹ️  No dev tools found",
+        "multimedia_none": "ℹ️  No multimedia cache found",
+        "steam_none": "ℹ️  Steam not installed",
+        "symlinks_none": "ℹ️  No broken symlinks",
+        "symlinks_found": "Found {0} broken symlinks",
+        "emptydirs_none": "ℹ️  No empty directories",
+        "emptydirs_found": "Found {0} empty directories",
+        "lang_label": "🌍 Language:",
+        "notif_title": "🧹 Cleanup completed",
+        "notif_msg": "Space freed: {0}",
+        "sched_title": "⏱  Automatic scheduling",
+        "sched_desc": "Configure automatic cleanup\nvia cron.",
+        "sched_freq": "Frequency",
+        "sched_daily": "Daily",
+        "sched_weekly": "Weekly",
+        "sched_monthly": "Monthly (1st of month)",
+        "sched_time": "Time (0-23)",
+        "sched_day": "Day (weekly only)",
+        "sched_sun": "Sunday",
+        "sched_mon": "Monday",
+        "sched_tue": "Tuesday",
+        "sched_wed": "Wednesday",
+        "sched_thu": "Thursday",
+        "sched_fri": "Friday",
+        "sched_sat": "Saturday",
+        "sched_note": "⚠️  Scheduling requires sudo password.",
+        "sched_save": "💾 Save",
+        "sched_remove": "🗑  Remove",
+        "sched_close": "Close",
+        "sched_ok_title": "Schedule active",
+        "sched_ok_msg": "✅ Schedule installed!\n\nCron expression: {0}\n\nLog: /var/log/pulizia_ubuntu.log",
+        "sched_remove_confirm_title": "Confirm",
+        "sched_remove_confirm_msg": "Remove the automatic schedule?",
+        "sched_removed_title": "Removed",
+        "sched_removed_msg": "Schedule removed successfully.",
+        "sched_err_time": "Invalid hour (0-23).",
+        "sched_service_title": "Cron service status",
+        "sched_service_active": "✅ Cron service ACTIVE",
+        "sched_service_inactive": "❌ Cron service DISABLED",
+        "sched_service_unknown": "⚠️  Service status unknown",
+        "sched_service_enable": "▶  Enable cron",
+        "sched_service_disable": "⏹  Disable cron",
+        "sched_service_enabled": "Cron service enabled and started.",
+        "sched_service_disabled": "Cron service disabled and stopped.",
+        "sched_service_disable_confirm": "Disable the cron service?",
+        "sched_entry_active": "✅ Pulizia Ubuntu schedule ACTIVE",
+        "sched_entry_inactive": "ℹ️  No Pulizia Ubuntu schedule",
+        "sched_config_title": "Schedule configuration",
+        "help_title": "📖 Online help",
+        "help_close": "Close",
+        "help_index": "📑 Index",
+        "disk_title": "📊 Disk space analysis",
+        "disk_analyzing": "Analyzing...",
+        "disk_path": "Path",
+        "disk_size": "Size",
+        "disk_total": "TOTAL",
+        "disk_close": "Close",
+        "disk_done": "Analysis complete. Largest directories on top.",
+    },
+}
+
+
+GUIDE_CONTENT = {
+    "it": [
+        ("Introduzione", """Benvenuto in Pulizia Ubuntu!
+
+Questa applicazione ti aiuta a mantenere il tuo sistema
+pulito e veloce rimuovendo file temporanei, cache e
+pacchetti non più necessari.
+
+Ogni operazione viene eseguita in modo sicuro: l'app
+usa solo comandi standard di Ubuntu e mostra sempre
+un report dettagliato di ciò che è stato fatto."""),
+        ("Esegui Pulizia", """Clicca "Esegui Pulizia" per avviare la
+manutenzione del sistema.
+
+L'app ti chiederà la password di amministratore (sudo).
+
+Al termine vedrai:
+  • Report in tempo reale
+  • Barra di progresso
+  • Notifica desktop
+  • Grafico spazio liberato"""),
+        ("Opzioni di pulizia", """Scegli quali operazioni eseguire:
+
+✓ Pulizia cache browser (Chrome, Chromium, Edge,
+  Firefox, Brave, Opera)
+✓ Rimozione vecchie revisioni Snap
+✓ Pulizia file temporanei
+✓ Pulizia anteprime
+✓ Svuotamento cestino
+✓ Pulizia config orfane (apt purge rc)
+✓ Rimozione librerie orfane (deborphan)
+✓ Rigenerazione liste APT
+✓ Rimozione vecchi kernel
+
+Sempre attive:
+  • Pulizia pacchetti orfani (apt autoremove)
+  • Pulizia cache APT
+  • Pulizia log systemd (mantiene ultimi 3 giorni)"""),
+        ("Pulizia APT avanzata", """Pulizia config orfane (rc):
+  Rimuove i file di configurazione di pacchetti
+  già disinstallati. Sicuro, libera sempre MB.
+
+Rimozione librerie orfane (deborphan):
+  Trova librerie non più usate da nessun pacchetto.
+  Richiede deborphan installato:
+    sudo apt install deborphan
+
+Rigenerazione liste APT:
+  Elimina e riscarica /var/lib/apt/lists.
+  Utile se hai errori "404 Not Found".
+  Richiede connessione internet."""),
+        ("Report", """Ogni operazione è registrata nel report.
+
+📋 Copia: copia il report negli appunti
+💾 Salva: salva in file .txt con data/ora"""),
+        ("Schedulazione", """Programma la pulizia automatica via cron.
+
+Il log è in /var/log/pulizia_ubuntu.log"""),
+        ("Notifiche", """Al termine di ogni pulizia ricevi una notifica
+desktop.
+
+Se non vedi le notifiche:
+  sudo apt install libnotify-bin"""),
+        ("Lingua", """Supporta Italiano e Inglese.
+
+Usa il menu in alto a destra per cambiare lingua."""),
+        ("Analisi disco", """Il pulsante "📊 Analisi disco" mostra le directory
+più grandi del sistema.
+
+Solo lettura: non cancella nulla."""),
+        ("Domande frequenti", """D: Serve sudo?
+R: Sì, per apt, journalctl, snap.
+
+D: La cache browser cancella le password?
+R: No. Solo cache temporanea.
+
+D: Dove trovo il log?
+R: /tmp/pulizia_ubuntu_debug.log
+
+D: Come disinstallo?
+R: sudo dpkg --purge pulizia-ubuntu"""),
+    ],
+    "en": [
+        ("Introduction", """Welcome to Ubuntu Cleanup!
+
+This app helps keep your system clean and fast by
+removing temporary files, caches and unnecessary
+packages.
+
+Every operation is safe: uses only standard Ubuntu
+commands and shows a detailed report."""),
+        ("Run Cleanup", """Click "Run Cleanup" to start maintenance.
+
+The app asks for sudo password.
+
+At the end you'll see:
+  • Real-time report
+  • Progress bar
+  • Desktop notification
+  • Freed space chart"""),
+        ("Cleanup Options", """Choose operations:
+
+✓ Browser cache (Chrome, Chromium, Edge, Firefox,
+  Brave, Opera)
+✓ Remove old Snap revisions
+✓ Temporary files cleanup
+✓ Thumbnails cleanup
+✓ Empty trash
+✓ Orphan config cleanup (apt purge rc)
+✓ Remove orphan libraries (deborphan)
+✓ Regenerate APT lists
+✓ Remove old kernels
+
+Always active:
+  • Orphan packages (apt autoremove)
+  • APT cache
+  • systemd logs (last 3 days)"""),
+        ("Advanced APT cleanup", """Orphan config cleanup (rc):
+  Removes config files of uninstalled packages.
+  Safe, frees some MB.
+
+Orphan libraries (deborphan):
+  Finds libraries no longer used. Requires:
+    sudo apt install deborphan
+
+Regenerate APT lists:
+  Deletes and re-downloads /var/lib/apt/lists.
+  Useful for "404 Not Found" errors."""),
+        ("Report", """Every operation is logged.
+
+📋 Copy: to clipboard
+💾 Save: to .txt file"""),
+        ("Scheduling", """Schedule automatic cleanup via cron.
+
+Log in /var/log/pulizia_ubuntu.log"""),
+        ("Notifications", """Desktop notification at end of cleanup.
+
+If missing:
+  sudo apt install libnotify-bin"""),
+        ("Language", """Supports Italian and English.
+
+Use dropdown at top right."""),
+        ("Disk analysis", """Click "📊 Disk analysis" to see largest directories.
+
+Read-only: nothing is deleted."""),
+        ("FAQ", """Q: Is sudo required?
+A: Yes, for apt, journalctl, snap.
+
+Q: Does browser cleanup remove passwords?
+A: No. Only cache.
+
+Q: Where's the log?
+A: /tmp/pulizia_ubuntu_debug.log
+
+Q: How to uninstall?
+A: sudo dpkg --purge pulizia-ubuntu"""),
+    ],
+}
+
+
+def _rileva_lingua():
+    for var in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
+        val = os.environ.get(var, "")
+        if val:
+            code = val.split(":")[0].split(".")[0].split("_")[0].lower()
+            if code in TRANSLATIONS:
+                return code
+    return "en"
+
+
+CURRENT_LANG = _rileva_lingua()
+
+
+# Tema corrente (dal settings o default dark)
+_settings_iniziali = carica_settings()
+CURRENT_THEME = _settings_iniziali.get("theme") or "dark"
+if _settings_iniziali.get("lang"):
+    CURRENT_LANG = _settings_iniziali["lang"]
+
+
+def T(key):
+    """Ritorna il colore del tema corrente."""
+    return THEMES[CURRENT_THEME][key]
+
+
+def _(key, *args):
+    testo = TRANSLATIONS.get(CURRENT_LANG, TRANSLATIONS["en"]).get(key, key)
+    if args:
+        try:
+            return testo.format(*args)
+        except Exception:
+            return testo
+    return testo
+
+
+def debug_log(msg):
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
+
+
+class PuliziaApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title(f"{APP_NAME} {APP_VERSION}")
+        self.root.geometry("820x780+80+40")
+        self.root.minsize(760, 660)
+        self.root.configure(bg=T("bg"))
+
+        self.report_lines = []
+        self.spazio_prima = 0
+        self.spazio_dopo = 0
+        self.totale_disco = 0
+        self.in_esecuzione = False
+        self.password_sudo = None
+        self.ui_queue = queue.Queue()
+
+        # Browser
+        self.var_browser_all = tk.BooleanVar(value=True)
+        self.var_chrome = tk.BooleanVar(value=True)
+        self.var_chromium = tk.BooleanVar(value=True)
+        self.var_edge = tk.BooleanVar(value=True)
+        self.var_firefox = tk.BooleanVar(value=True)
+        self.var_brave = tk.BooleanVar(value=True)
+        self.var_opera = tk.BooleanVar(value=True)
+
+        # Altre opzioni
+        self.var_snap = tk.BooleanVar(value=True)
+        self.var_tmp = tk.BooleanVar(value=True)
+        self.var_thumbnails = tk.BooleanVar(value=True)
+        self.var_trash = tk.BooleanVar(value=True)
+        self.var_apt_purge = tk.BooleanVar(value=True)
+        self.var_flatpak = tk.BooleanVar(value=True)
+        self.var_docker = tk.BooleanVar(value=False)
+        self.var_trim = tk.BooleanVar(value=False)
+        self.var_recent = tk.BooleanVar(value=True)
+        self.var_dev_cache = tk.BooleanVar(value=True)
+        self.var_multimedia = tk.BooleanVar(value=True)
+        self.var_steam = tk.BooleanVar(value=False)
+        self.var_symlinks = tk.BooleanVar(value=False)
+        self.var_emptydirs = tk.BooleanVar(value=False)
+        self.var_apt_deborphan = tk.BooleanVar(value=False)
+        self.var_apt_lists = tk.BooleanVar(value=False)
+        self.var_kernels = tk.BooleanVar(value=False)
+
+        debug_log("=" * 50)
+        debug_log(f"=== App avviata - {APP_NAME} {APP_VERSION} ===")
+
+        self._set_icona()
+        self._build_ui()
+        self._calcola_spazio_iniziale()
+        self._avvia_poller_coda()
+
+        self.root.bind("<F1>", lambda e: self.apri_guida())
+        self.root.bind("<Control-h>", lambda e: self.apri_guida())
+
+        self.root.attributes("-topmost", True)
+        self.root.after(300, lambda: (
+            self.root.lift(),
+            self.root.focus_force(),
+            self.root.attributes("-topmost", False)
+        ))
+
+    def _set_icona(self):
+        percorsi = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "icona.png"),
+            "/usr/share/icons/hicolor/256x256/apps/pulizia-ubuntu.png",
+            "/usr/share/icons/hicolor/128x128/apps/pulizia-ubuntu.png",
+            "/usr/share/pulizia-ubuntu/icona.png",
+        ]
+        for p in percorsi:
+            if os.path.exists(p):
+                try:
+                    img = tk.PhotoImage(file=p)
+                    self.root.iconphoto(True, img)
+                    self._icona_ref = img
+                    return
+                except Exception:
+                    continue
+
+    def _build_ui(self):
+        header = tk.Frame(self.root, bg=T("bg"))
+        header.pack(fill=tk.X, pady=(10, 0))
+
+        frame_lang = tk.Frame(header, bg=T("bg"))
+        frame_lang.pack(side=tk.RIGHT, padx=15)
+        tk.Label(frame_lang, text=_("lang_label"), font=("Ubuntu", 9),
+                 bg=T("bg"), fg=T("fg_muted")).pack(side=tk.LEFT)
+        self.lang_var = tk.StringVar(value=CURRENT_LANG)
+        lang_combo = ttk.Combobox(frame_lang, textvariable=self.lang_var,
+                                  state="readonly", width=4,
+                                  values=["it", "en"], font=("Ubuntu", 9))
+        lang_combo.pack(side=tk.LEFT, padx=4)
+        lang_combo.bind("<<ComboboxSelected>>", self._cambia_lingua)
+
+        # Selettore tema
+        frame_theme = tk.Frame(header, bg=T("bg"))
+        frame_theme.pack(side=tk.RIGHT, padx=15)
+        tk.Label(frame_theme, text=_("theme_label"), font=("Ubuntu", 9),
+                 bg=T("bg"), fg=T("fg_muted")).pack(side=tk.LEFT)
+        self.theme_var = tk.StringVar(value=CURRENT_THEME)
+        theme_combo = ttk.Combobox(
+            frame_theme, textvariable=self.theme_var, state="readonly",
+            width=10,
+            values=["dark", "light", "nord", "dracula", "solarized"],
+            font=("Ubuntu", 9))
+        theme_combo.pack(side=tk.LEFT, padx=4)
+        theme_combo.bind("<<ComboboxSelected>>", self._cambia_tema)
+
+        self.lbl_titolo = tk.Label(header, text=_("app_title"),
+                                   font=("Ubuntu", 20, "bold"),
+                                   bg=T("bg"), fg=T("fg"))
+        self.lbl_titolo.pack()
+        self.lbl_sottotitolo = tk.Label(
+            self.root, text=f"{_('subtitle')}  |  v{APP_VERSION}",
+            font=("Ubuntu", 10, "italic"),
+            bg=T("bg"), fg=T("fg_muted"))
+        self.lbl_sottotitolo.pack(pady=(2, 6))
+
+        # ============================================================
+        # OPZIONI IN 3 GRUPPI COLLASSABILI
+        # ============================================================
+        self.frame_opt = tk.LabelFrame(
+            self.root, text=_("options_title"),
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"), bd=2, relief="groove")
+        self.frame_opt.pack(fill=tk.X, padx=20, pady=6)
+
+        self.checkbuttons = {}
+
+        # --- Gruppo 1: BROWSER ---
+        self.gruppo_browser = self._crea_gruppo_opt(
+            self.frame_opt, _("group_browser"), "\U0001F310", default_open=True)
+
+        frame_browsers = tk.Frame(self.gruppo_browser, bg=T("bg_widget"))
+        frame_browsers.pack(fill=tk.X, padx=10, pady=2)
+
+        cb_all = tk.Checkbutton(
+            frame_browsers, text=_("opt_browser"),
+            variable=self.var_browser_all,
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"),
+            selectcolor=T("select_bg"),
+            activebackground=T("bg_widget"),
+            activeforeground=T("accent"),
+            anchor="w", command=self._toggle_all_browsers)
+        cb_all.pack(fill=tk.X)
+        self.checkbuttons["opt_browser"] = cb_all
+
+        frame_sub = tk.Frame(self.gruppo_browser, bg=T("bg_widget"))
+        frame_sub.pack(fill=tk.X, padx=10, pady=(0, 4))
+        self.browser_vars = {
+            "chrome": self.var_chrome,
+            "chromium": self.var_chromium,
+            "edge": self.var_edge,
+            "firefox": self.var_firefox,
+            "brave": self.var_brave,
+            "opera": self.var_opera,
+        }
+        for i, (nome, var) in enumerate(self.browser_vars.items()):
+            r, c = i // 3, i % 3
+            cb = tk.Checkbutton(
+                frame_sub, text=nome.capitalize(),
+                variable=var, font=("Ubuntu", 9),
+                bg=T("bg_widget"), fg=T("fg"),
+                selectcolor=T("select_bg"),
+                activebackground=T("bg_widget"),
+                activeforeground=T("accent"),
+                anchor="w", command=self._sync_master_browser)
+            cb.grid(row=r, column=c, sticky="w", padx=15, pady=1)
+
+        # --- Gruppo 2: SISTEMA ---
+        self.gruppo_sistema = self._crea_gruppo_opt(
+            self.frame_opt, _("group_system"), "\u2699\ufe0f", default_open=True)
+
+        for key, var in [("opt_snap", self.var_snap),
+                         ("opt_tmp", self.var_tmp),
+                         ("opt_thumb", self.var_thumbnails),
+                         ("opt_trash", self.var_trash),
+                         ("opt_apt_purge", self.var_apt_purge),
+                         ("opt_recent", self.var_recent),
+                         ("opt_dev_cache", self.var_dev_cache),
+                         ("opt_multimedia", self.var_multimedia)]:
+            cb = tk.Checkbutton(
+                self.gruppo_sistema, text=_(key), variable=var,
+                font=("Ubuntu", 10),
+                bg=T("bg_widget"), fg=T("fg"),
+                selectcolor=T("select_bg"),
+                activebackground=T("bg_widget"),
+                activeforeground=T("accent"),
+                anchor="w")
+            cb.pack(fill=tk.X, padx=10, pady=2)
+            self.checkbuttons[key] = cb
+
+        # --- Gruppo 3: AVANZATE ---
+        self.gruppo_avanzate = self._crea_gruppo_opt(
+            self.frame_opt, _("group_advanced"), "\U0001F680", default_open=False)
+
+        for key, var in [("opt_apt_deborphan", self.var_apt_deborphan),
+                         ("opt_apt_lists", self.var_apt_lists),
+                         ("opt_flatpak", self.var_flatpak),
+                         ("opt_docker", self.var_docker),
+                         ("opt_trim", self.var_trim),
+                         ("opt_steam", self.var_steam),
+                         ("opt_symlinks", self.var_symlinks),
+                         ("opt_emptydirs", self.var_emptydirs),
+                         ("opt_kernels", self.var_kernels)]:
+            cb = tk.Checkbutton(
+                self.gruppo_avanzate, text=_(key), variable=var,
+                font=("Ubuntu", 10),
+                bg=T("bg_widget"), fg=T("fg"),
+                selectcolor=T("select_bg"),
+                activebackground=T("bg_widget"),
+                activeforeground=T("accent"),
+                anchor="w")
+            cb.pack(fill=tk.X, padx=10, pady=2)
+            self.checkbuttons[key] = cb
+
+        # Pulsanti
+        # ============================================================
+        # TOOLBAR PRINCIPALE (menu strumenti + azioni principali)
+        # ============================================================
+        frame_btn = tk.Frame(self.root, bg=T("bg"))
+        frame_btn.pack(pady=8)
+
+        # --- Menu "Strumenti" a tendina ---
+        self.btn_menu = tk.Menubutton(
+            frame_btn, text=_("btn_tools"),
+            font=("Ubuntu", 11, "bold"),
+            bg="#2980b9", fg="white",
+            activebackground="#3498db", activeforeground="white",
+            relief="flat", width=16, height=2,
+            cursor="hand2", indicatoron=True)
+        self.btn_menu.pack(side=tk.LEFT, padx=4)
+
+        # Menu popup
+        self.menu_tools = tk.Menu(
+            self.btn_menu, tearoff=0,
+            font=("Ubuntu", 10),
+            bg=T("bg_widget"), fg=T("fg"),
+            activebackground="#2980b9", activeforeground="white",
+            relief="flat", bd=1)
+        self.btn_menu.config(menu=self.menu_tools)
+
+        self.menu_tools.add_command(
+            label=_("menu_schedule"),
+            command=self.apri_schedulazione)
+        self.menu_tools.add_command(
+            label=_("menu_disk"),
+            command=self.analizza_disco)
+        self.menu_tools.add_command(
+            label=_("menu_stats"),
+            command=self.mostra_statistiche)
+        self.menu_tools.add_separator()
+        self.menu_tools.add_command(
+            label=_("menu_shred"),
+            command=self.apri_shred)
+
+        # --- Esegui Pulizia (pulsante principale) ---
+        self.btn_esegui = tk.Button(
+            frame_btn, text=_("btn_run"),
+            font=("Ubuntu", 12, "bold"),
+            bg="#27ae60", fg="white",
+            activebackground="#2ecc71", activeforeground="white",
+            relief="flat", width=20, height=2,
+            cursor="hand2",
+            command=self.avvia_pulizia)
+        self.btn_esegui.pack(side=tk.LEFT, padx=6)
+
+        # --- Guida ---
+        self.btn_guida = tk.Button(
+            frame_btn, text=_("btn_help_short"),
+            font=("Ubuntu", 11, "bold"),
+            bg="#8e44ad", fg="white",
+            activebackground="#9b59b6", activeforeground="white",
+            relief="flat", width=8, height=2,
+            cursor="hand2",
+            command=self.apri_guida)
+        self.btn_guida.pack(side=tk.LEFT, padx=4)
+
+        # --- Esci ---
+        self.btn_esci = tk.Button(
+            frame_btn, text=_("btn_exit_short"),
+            font=("Ubuntu", 11, "bold"),
+            bg="#c0392b", fg="white",
+            activebackground="#e74c3c", activeforeground="white",
+            relief="flat", width=8, height=2,
+            cursor="hand2",
+            command=self.esci)
+        self.btn_esci.pack(side=tk.LEFT, padx=4)
+
+        self.progress = ttk.Progressbar(self.root, orient="horizontal",
+                                        length=740, mode="determinate")
+        self.progress.pack(pady=6, padx=20, fill=tk.X)
+
+        self.lbl_stato = tk.Label(self.root, text=_("status_ready"),
+                                  font=("Ubuntu", 10),
+                                  bg=T("bg"), fg=T("accent"))
+        self.lbl_stato.pack(pady=4)
+
+        # Report rimosso dalla finestra principale (vedi _mostra_report_finale)
+
+    def _crea_gruppo_opt(self, parent, titolo, icona, default_open=False):
+        """Crea un gruppo collassabile di opzioni."""
+        frame = tk.Frame(parent, bg=T("bg_widget"))
+        frame.pack(fill=tk.X, padx=6, pady=2)
+
+        # Header cliccabile
+        header = tk.Frame(frame, bg=T("bg_widget"))
+        header.pack(fill=tk.X)
+
+        # Freccia
+        freccia = tk.Label(
+            header, text="\u25be" if default_open else "\u25b8",
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("accent"),
+            cursor="hand2", width=2)
+        freccia.pack(side=tk.LEFT)
+
+        # Titolo
+        testo_titolo = f"{icona}  {titolo}"
+        lbl = tk.Label(
+            header, text=testo_titolo,
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"),
+            anchor="w", cursor="hand2")
+        lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Contenuto
+        contenuto = tk.Frame(frame, bg=T("bg_widget"))
+
+        stato = {"aperto": default_open}
+
+        def toggle(event=None):
+            if stato["aperto"]:
+                contenuto.pack_forget()
+                freccia.config(text="\u25b8")
+                stato["aperto"] = False
+            else:
+                contenuto.pack(fill=tk.X, pady=(2, 4))
+                freccia.config(text="\u25be")
+                stato["aperto"] = True
+
+        freccia.bind("<Button-1>", toggle)
+        lbl.bind("<Button-1>", toggle)
+        header.bind("<Button-1>", toggle)
+
+        if default_open:
+            contenuto.pack(fill=tk.X, pady=(2, 4))
+
+        return contenuto
+
+    def _crea_pulsante(self, parent, testo, bg, active_bg, comando, width=15):
+        return tk.Button(parent, text=testo, font=("Ubuntu", 11, "bold"),
+                         bg=bg, fg="white", activebackground=active_bg,
+                         activeforeground="white", width=width, height=2,
+                         cursor="hand2", relief="flat", command=comando)
+
+    def _toggle_all_browsers(self):
+        val = self.var_browser_all.get()
+        for v in self.browser_vars.values():
+            v.set(val)
+
+    def _sync_master_browser(self):
+        tutti_attivi = all(v.get() for v in self.browser_vars.values())
+        self.var_browser_all.set(tutti_attivi)
+
+    def _cambia_tema(self, event=None):
+        """Cambia il tema e ricostruisce l'interfaccia."""
+        global CURRENT_THEME
+        CURRENT_THEME = self.theme_var.get()
+        salva_settings(theme=CURRENT_THEME)
+        debug_log(f"Tema cambiato: {CURRENT_THEME}")
+        self._refresh_tema()
+
+    def _refresh_tema(self):
+        """Riapplica il tema a tutti i widget."""
+        # Distruggi e ricrea l'interfaccia
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Reset stato
+        self.report_lines_backup = list(self.report_lines)
+
+        # Ricostruisci
+        self._build_ui()
+        self.root.configure(bg=T("bg"))
+
+        # Ripristina report
+        if self.report_lines_backup:
+            self.txt_report.config(state=tk.NORMAL)
+            self.txt_report.insert(tk.END,
+                                   "\n".join(self.report_lines_backup) + "\n")
+            self.txt_report.see(tk.END)
+            self.txt_report.config(state=tk.DISABLED)
+            self.btn_salva.config(state=tk.NORMAL)
+            self.btn_copia.config(state=tk.NORMAL)
+
+    def _cambia_lingua(self, event=None):
+        global CURRENT_LANG
+        CURRENT_LANG = self.lang_var.get()
+        self.lbl_titolo.config(text=_("app_title"))
+        self.lbl_sottotitolo.config(text=f"{_('subtitle')}  |  v{APP_VERSION}")
+        self.frame_opt.config(text=_("options_title"))
+        for key, cb in self.checkbuttons.items():
+            cb.config(text=_(key))
+        self.lbl_titolo.config(text=_("app_title"))
+        self.lbl_sottotitolo.config(text=f"{_('subtitle')}  |  v{APP_VERSION}")
+        self.frame_opt.config(text=_("options_title"))
+        self.btn_menu.config(text=_("btn_tools"))
+        self.btn_esegui.config(text=_("btn_run"))
+        self.btn_guida.config(text=_("btn_help_short"))
+        self.btn_esci.config(text=_("btn_exit_short"))
+        self.lbl_stato.config(text=_("status_ready"))
+
+    def _avvia_poller_coda(self):
+        try:
+            while True:
+                tipo, payload = self.ui_queue.get_nowait()
+                if tipo == "stato":
+                    self.lbl_stato.config(text=payload)
+                elif tipo == "progress":
+                    self.progress["value"] = payload
+                elif tipo == "abilita_pulsanti":
+                    self._set_pulsanti(payload)
+                elif tipo == "info":
+                    messagebox.showinfo(*payload)
+                elif tipo == "error":
+                    messagebox.showerror(*payload)
+                elif tipo == "warning":
+                    messagebox.showwarning(*payload)
+                elif tipo == "grafico":
+                    self._mostra_report_finale(*payload)
+        except queue.Empty:
+            pass
+        finally:
+            self.root.after(100, self._avvia_poller_coda)
+
+    def _mostra_report_finale(self, prima, dopo, totale):
+        """Mostra finestra unificata: grafico compatto + report."""
+        win = tk.Toplevel(self.root)
+        win.title(_("final_title"))
+        win.geometry("820x760")
+        win.minsize(720, 620)
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+
+        # ============================================================
+        # HEADER
+        # ============================================================
+        tk.Label(win, text=_("final_title"),
+                 font=("Ubuntu", 16, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 4))
+
+        # Delta spazio
+        delta = dopo - prima
+        if delta > 0:
+            testo_delta = _("final_freed",
+                            self._bytes_a_human(delta))
+            colore_delta = T("success")
+        elif delta == 0:
+            testo_delta = _("final_no_change")
+            colore_delta = T("fg_muted")
+        else:
+            testo_delta = _("final_used",
+                            self._bytes_a_human(abs(delta)))
+            colore_delta = T("error")
+
+        tk.Label(win, text=testo_delta,
+                 font=("Ubuntu", 12, "bold"),
+                 bg=T("bg"), fg=colore_delta).pack(pady=(0, 8))
+
+        # ============================================================
+        # GRAFICO COMPATTO (in alto)
+        # ============================================================
+        frame_graph = tk.Frame(win, bg=T("bg"))
+        frame_graph.pack(fill=tk.X, padx=20, pady=4)
+
+        try:
+            import matplotlib
+            matplotlib.use("TkAgg")
+            from matplotlib.figure import Figure
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+            # Figura compatta (8x3 pollici)
+            fig = Figure(figsize=(8, 2.8), dpi=90, facecolor=T("bg"))
+            ax = fig.add_subplot(111, facecolor=T("bg_text"))
+
+            usato_prima = totale - prima
+            usato_dopo = totale - dopo
+
+            labels = [_("graph_before"), _("graph_after")]
+            usati_gb = [usato_prima / (1024**3), usato_dopo / (1024**3)]
+            liberi_gb = [prima / (1024**3), dopo / (1024**3)]
+
+            x = [0, 1]
+            ax.bar(x, usati_gb, 0.5, label=_("graph_used"),
+                   color="#e74c3c", edgecolor="white", linewidth=0.5)
+            ax.bar(x, liberi_gb, 0.5, bottom=usati_gb,
+                   label=_("graph_free"), color="#27ae60",
+                   edgecolor="white", linewidth=0.5)
+
+            # Etichette valori (solo se spazio sufficiente)
+            for i, (u, f) in enumerate(zip(usati_gb, liberi_gb)):
+                if u > 1:
+                    ax.text(i, u / 2, f"{u:.1f} GB",
+                            ha="center", va="center",
+                            color="white", fontweight="bold", fontsize=9)
+                if f > 1:
+                    ax.text(i, u + f / 2, f"{f:.1f} GB",
+                            ha="center", va="center",
+                            color="white", fontweight="bold", fontsize=9)
+
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, color=T("fg"), fontsize=10)
+            ax.set_ylabel("GB", color=T("fg"), fontsize=9)
+            ax.tick_params(axis="y", colors=T("fg"), labelsize=8)
+            ax.spines["bottom"].set_color(T("border"))
+            ax.spines["left"].set_color(T("border"))
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(axis="y", linestyle="--", alpha=0.3, color=T("border"))
+            ax.legend(loc="upper right",
+                      facecolor=T("bg_widget"),
+                      edgecolor=T("border"),
+                      labelcolor=T("fg"),
+                      fontsize=8)
+            fig.tight_layout()
+
+            canvas = FigureCanvasTkAgg(fig, master=frame_graph)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.X, expand=False)
+
+        except ImportError:
+            tk.Label(frame_graph, text=_("graph_no_mpl"),
+                     font=("Ubuntu", 10),
+                     bg=T("bg"), fg=T("accent"),
+                     justify="center").pack(pady=20)
+
+        # ============================================================
+        # SEPARATORE
+        # ============================================================
+        tk.Frame(win, height=1, bg=T("border")).pack(
+            fill=tk.X, padx=20, pady=8)
+
+        # ============================================================
+        # HEADER REPORT + pulsanti Salva/Copia
+        # ============================================================
+        frame_head = tk.Frame(win, bg=T("bg"))
+        frame_head.pack(fill=tk.X, padx=20, pady=(0, 4))
+
+        tk.Label(frame_head, text=_("report_label"),
+                 font=("Ubuntu", 11, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(side=tk.LEFT)
+
+        btn_salva = tk.Button(
+            frame_head, text=_("btn_save"),
+            font=("Ubuntu", 9),
+            bg="#16a085", fg="white",
+            activebackground="#1abc9c", activeforeground="white",
+            relief="flat", cursor="hand2", padx=8,
+            command=self.salva_report)
+        btn_salva.pack(side=tk.RIGHT, padx=4)
+
+        btn_copia = tk.Button(
+            frame_head, text=_("btn_copy"),
+            font=("Ubuntu", 9),
+            bg="#8e44ad", fg="white",
+            activebackground="#9b59b6", activeforeground="white",
+            relief="flat", cursor="hand2", padx=8,
+            command=self.copia_report)
+        btn_copia.pack(side=tk.RIGHT, padx=4)
+
+        # ============================================================
+        # REPORT SCROLLABILE
+        # ============================================================
+        frame_report = tk.Frame(win, bg=T("bg"))
+        frame_report.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 8))
+
+        txt = scrolledtext.ScrolledText(
+            frame_report, wrap=tk.WORD,
+            font=("Ubuntu Mono", 9),
+            bg=T("bg_text"), fg=T("fg"),
+            insertbackground=T("fg"),
+            relief="flat", padx=8, pady=8, height=12)
+        txt.pack(fill=tk.BOTH, expand=True)
+
+        # Popola con il report
+        txt.insert(tk.END, "\n".join(self.report_lines))
+        txt.config(state=tk.DISABLED)
+        # Scroll in fondo
+        txt.see(tk.END)
+
+        # ============================================================
+        # PULSANTE CHIUDI
+        # ============================================================
+        frame_btn = tk.Frame(win, bg=T("bg"))
+        frame_btn.pack(pady=10)
+
+        tk.Button(frame_btn, text=_("final_close"),
+                  font=("Ubuntu", 11, "bold"),
+                  bg="#27ae60", fg="white",
+                  activebackground="#2ecc71", activeforeground="white",
+                  relief="flat", cursor="hand2",
+                  width=14, height=2,
+                  command=win.destroy).pack()
+
+        win.bind("<Escape>", lambda e: win.destroy())
+
+    def _mostra_grafico(self, prima, dopo, totale):
+        """[DEPRECATO] Chiama _mostra_report_finale."""
+        self._mostra_report_finale(prima, dopo, totale)
+
+    def _calcola_spazio_iniziale(self):
+        try:
+            u = shutil.disk_usage("/")
+            self.spazio_prima = u.free
+            self.totale_disco = u.total
+        except Exception:
+            self.spazio_prima = 0
+            self.totale_disco = 0
+
+    def _log(self, testo):
+        self.report_lines.append(testo)
+
+    def _set_stato(self, testo):
+        self.ui_queue.put(("stato", testo))
+
+    def _set_progress(self, valore):
+        self.ui_queue.put(("progress", valore))
+
+    def _bytes_a_human(self, b):
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if b < 1024:
+                return f"{b:.2f} {unit}"
+            b /= 1024
+        return f"{b:.2f} PB"
+
+    def _esegui_comando(self, cmd, timeout=300):
+        if any(op in cmd for op in ["|", ">", "<", "&&", ";", "*"]):
+            args = ["bash", "-c", cmd]
+            usa_sudo = "sudo " in cmd
+        else:
+            args = cmd.split()
+            usa_sudo = args and args[0] == "sudo"
+            if usa_sudo:
+                args = ["sudo", "-S", "-p", ""] + args[1:]
+        try:
+            if usa_sudo and args[0] == "sudo":
+                r = subprocess.run(args,
+                                   input=(self.password_sudo or "") + "\n",
+                                   capture_output=True, text=True,
+                                   timeout=timeout)
+            elif usa_sudo:
+                r = subprocess.run(args,
+                                   input=((self.password_sudo or "") + "\n") * 10,
+                                   capture_output=True, text=True,
+                                   timeout=timeout)
+            else:
+                r = subprocess.run(args, capture_output=True, text=True,
+                                   timeout=timeout)
+            sl = (r.stderr or "").lower()
+            if ("incorrect password" in sl or
+                    "password incorretta" in sl or
+                    "autenticazione non riuscita" in sl or
+                    "sorry, try again" in sl):
+                return False, "ERRORE_PASSWORD"
+            return r.returncode == 0, (r.stdout or "").strip() or (r.stderr or "").strip()
+        except subprocess.TimeoutExpired:
+            return False, "Timeout comando"
+        except Exception as e:
+            return False, str(e)
+
+    def _sudo_in_cache(self):
+        try:
+            r = subprocess.run(["sudo", "-n", "true"],
+                               capture_output=True, text=True, timeout=5)
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    def _chiedi_password(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title(_("pwd_title"))
+        dialog.geometry("440x230")
+        dialog.configure(bg=T("bg"))
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - 220
+        y = (dialog.winfo_screenheight() // 2) - 115
+        dialog.geometry(f"+{x}+{y}")
+
+        tk.Label(dialog, text=_("pwd_title"), font=("Ubuntu", 13, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(15, 5))
+        tk.Label(dialog, text=_("pwd_msg"), font=("Ubuntu", 9),
+                 bg=T("bg"), fg=T("fg_muted"),
+                 justify="center").pack(pady=(0, 10))
+
+        fi = tk.Frame(dialog, bg=T("bg"))
+        fi.pack(pady=5)
+        tk.Label(fi, text=_("pwd_key"), font=("Ubuntu", 14),
+                 bg=T("bg"), fg=T("accent")).pack(side=tk.LEFT, padx=(0, 5))
+        entry = tk.Entry(fi, show="●", font=("Ubuntu", 12), width=25,
+                         bg=T("bg_text"), fg=T("fg"), insertbackground="white",
+                         relief="flat", bd=5)
+        entry.pack(side=tk.LEFT)
+        entry.focus_set()
+        ris = {"pwd": None}
+
+        def ok(event=None):
+            p = entry.get()
+            if p:
+                ris["pwd"] = p
+                dialog.destroy()
+
+        entry.bind("<Return>", ok)
+
+        fb = tk.Frame(dialog, bg=T("bg"))
+        fb.pack(pady=15)
+        tk.Button(fb, text=_("pwd_confirm"), font=("Ubuntu", 10, "bold"),
+                  bg="#27ae60", fg="white", relief="flat", width=12,
+                  cursor="hand2", command=ok).pack(side=tk.LEFT, padx=5)
+        tk.Button(fb, text=_("pwd_cancel"), font=("Ubuntu", 10, "bold"),
+                  bg="#c0392b", fg="white", relief="flat", width=12,
+                  cursor="hand2", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+        dialog.wait_window()
+        return ris["pwd"]
+
+    def _assicura_sudo(self):
+        if self._sudo_in_cache():
+            return True
+        pwd = self._chiedi_password()
+        if pwd is None:
+            return False
+        try:
+            r = subprocess.run(["sudo", "-S", "-p", "", "-v"],
+                               input=pwd + "\n", capture_output=True,
+                               text=True, timeout=15)
+            if r.returncode != 0:
+                messagebox.showerror(_("pwd_wrong_title"),
+                                     _("pwd_wrong_msg", r.stderr.strip() or "?"))
+                return False
+            self.password_sudo = pwd
+            return True
+        except subprocess.TimeoutExpired:
+            messagebox.showerror(_("pwd_timeout_title"), _("pwd_timeout_msg"))
+            return False
+        except Exception as e:
+            messagebox.showerror(_("error_title"), str(e))
+            return False
+
+    def avvia_pulizia(self):
+        if self.in_esecuzione:
+            return
+        if not messagebox.askyesno(_("confirm_title"), _("confirm_msg")):
+            return
+        if not self._assicura_sudo():
+            return
+        self.in_esecuzione = True
+        self._set_pulsanti(False)
+        self.report_lines = []
+        self._set_progress(0)
+        threading.Thread(target=self._esegui_pulizia, daemon=True).start()
+
+    def _esegui_pulizia(self):
+        try:
+            self._calcola_spazio_iniziale()
+            self._log("=" * 70)
+            self._log(f"  {_('report_header')} - "
+                      f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+            self._log("=" * 70)
+            self._log(f"{_('initial_free')} "
+                      f"{self._bytes_a_human(self.spazio_prima)}")
+            self._log("")
+
+            passi = [
+                (_("step_autoremove"), "sudo apt-get autoremove --purge -y"),
+                (_("step_apt_clean"), "sudo apt-get clean"),
+                (_("step_apt_autoclean"), "sudo apt-get autoclean"),
+                (_("step_journal"), "sudo journalctl --vacuum-time=3d"),
+            ]
+            if self.var_snap.get():
+                passi.append((_("step_snap"), "SNAP"))
+            if self.var_tmp.get():
+                passi.append((_("step_tmp"), "TMP"))
+            browser_attivi = [n for n, v in self.browser_vars.items() if v.get()]
+            if browser_attivi:
+                passi.append((_("step_browser"),
+                              "BROWSER:" + ",".join(browser_attivi)))
+            if self.var_thumbnails.get():
+                passi.append((_("step_thumb"), "THUMB"))
+            if self.var_trash.get():
+                passi.append((_("step_trash"), "TRASH"))
+            if self.var_apt_purge.get():
+                passi.append((_("step_apt_purge"), "APT_PURGE"))
+            if self.var_apt_deborphan.get():
+                passi.append((_("step_apt_deborphan"), "DEBORPHAN"))
+            if self.var_apt_lists.get():
+                passi.append((_("step_apt_lists"), "APT_LISTS"))
+            if self.var_flatpak.get():
+                passi.append((_("step_flatpak"), "FLATPAK"))
+            if self.var_docker.get():
+                passi.append((_("step_docker"), "DOCKER"))
+            if self.var_trim.get():
+                passi.append((_("step_trim"), "TRIM"))
+            if self.var_steam.get():
+                passi.append((_("step_steam"), "STEAM"))
+            if self.var_symlinks.get():
+                passi.append((_("step_symlinks"), "SYMLINKS"))
+            if self.var_emptydirs.get():
+                passi.append((_("step_emptydirs"), "EMPTYDIRS"))
+            if self.var_recent.get():
+                passi.append((_("step_recent"), "RECENT"))
+            if self.var_dev_cache.get():
+                passi.append((_("step_dev_cache"), "DEV_CACHE"))
+            if self.var_multimedia.get():
+                passi.append((_("step_multimedia"), "MULTIMEDIA"))
+            if self.var_kernels.get():
+                passi.append((_("step_kernels"), "KERNELS"))
+
+            totale = len(passi)
+            completati = 0
+
+            for stato, cmd in passi:
+                self._set_stato(stato)
+                self._log(f"▶ {stato}")
+
+                if cmd == "SNAP":
+                    self._pulisci_snap()
+                elif cmd == "TMP":
+                    self._pulisci_tmp()
+                elif cmd.startswith("BROWSER:"):
+                    self._pulisci_browser(cmd.split(":", 1)[1].split(","))
+                elif cmd == "THUMB":
+                    self._pulisci_thumbnails()
+                elif cmd == "TRASH":
+                    self._svuota_cestino()
+                elif cmd == "APT_PURGE":
+                    self._pulisci_apt_purge()
+                elif cmd == "DEBORPHAN":
+                    self._pulisci_deborphan()
+                elif cmd == "APT_LISTS":
+                    self._pulisci_apt_lists()
+                elif cmd == "FLATPAK":
+                    self._pulisci_flatpak()
+                elif cmd == "DOCKER":
+                    self._pulisci_docker()
+                elif cmd == "TRIM":
+                    self._esegui_trim()
+                elif cmd == "STEAM":
+                    self._pulisci_steam()
+                elif cmd == "SYMLINKS":
+                    self._pulisci_symlinks()
+                elif cmd == "EMPTYDIRS":
+                    self._pulisci_emptydirs()
+                elif cmd == "RECENT":
+                    self._pulisci_recently_used()
+                elif cmd == "DEV_CACHE":
+                    self._pulisci_dev_cache()
+                elif cmd == "MULTIMEDIA":
+                    self._pulisci_multimedia()
+                elif cmd == "KERNELS":
+                    self._gestisci_kernel()
+                else:
+                    ok, out = self._esegui_comando(cmd)
+                    if ok:
+                        self._log(f"   {_('ok')}")
+                        if out:
+                            for r in out.split("\n")[-5:]:
+                                if r.strip():
+                                    self._log(f"      {r}")
+                    elif out == "ERRORE_PASSWORD":
+                        self._log("   ❌ " + _("pwd_expired_msg"))
+                        self.password_sudo = None
+                        self.ui_queue.put(("error", (_("pwd_expired_title"),
+                                                     _("pwd_expired_msg"))))
+                        return
+                    else:
+                        self._log(f"   ⚠️  {out}")
+
+                self._log("")
+                completati += 1
+                self._set_progress((completati / totale) * 100)
+
+            self.spazio_dopo = shutil.disk_usage("/").free
+            liberato = self.spazio_dopo - self.spazio_prima
+
+            self._log("=" * 70)
+            self._log(f"  📊 {_('final_summary')}")
+            self._log("=" * 70)
+            self._log(f"{_('final_free')} "
+                      f"{self._bytes_a_human(self.spazio_dopo)}")
+            if liberato > 0:
+                self._log(f"{_('freed_positive')} "
+                          f"{self._bytes_a_human(liberato)}")
+            elif liberato == 0:
+                self._log(_("freed_zero"))
+            else:
+                self._log(_("freed_negative",
+                            self._bytes_a_human(abs(liberato))))
+            self._log("")
+            self._log(f"{_('completed_at')} "
+                      f"{datetime.now().strftime('%H:%M:%S')}")
+
+            self._set_stato(_("status_done"))
+            self._set_progress(100)
+            # Salva statistica
+            self._salva_statistica(liberato)
+
+            self._invia_notifica(
+                _("notif_title"),
+                _("notif_msg", self._bytes_a_human(max(liberato, 0))))
+            self.ui_queue.put(("grafico",
+                               (self.spazio_prima, self.spazio_dopo,
+                                self.totale_disco)))
+            # Il popup è ora dentro _mostra_report_finale
+        except Exception as e:
+            debug_log(f"_esegui_pulizia: {e}")
+            self._log(f"\n❌ {e}")
+            self._set_stato(_("status_error"))
+            self.ui_queue.put(("error", (_("error_title"), str(e))))
+        finally:
+            self.in_esecuzione = False
+            self.ui_queue.put(("abilita_pulsanti", True))
+
+    def _pulisci_snap(self):
+        if not shutil.which("snap"):
+            self._log(f"   {_('snap_none')}")
+            return
+        ok, out = self._esegui_comando(
+            "snap list --all | awk '/disabled/{print $1, $3}'")
+        if ok and out.strip():
+            righe = [r for r in out.strip().split("\n") if r.strip()]
+            self._log(f"   {_('snap_found', len(righe))}")
+            for riga in righe:
+                p = riga.split()
+                if len(p) >= 2:
+                    self._log(f"      - {p[0]} (rev {p[1]})...")
+                    self._esegui_comando(
+                        f"sudo snap remove {p[0]} --revision={p[1]}")
+        else:
+            self._log(f"   {_('snap_no_rev')}")
+
+    def _pulisci_tmp(self):
+        self._esegui_comando(
+            "sudo find /tmp -type f -atime +7 -delete 2>/dev/null")
+        self._esegui_comando(
+            "sudo find /var/tmp -type f -atime +30 -delete 2>/dev/null")
+        self._log(f"   {_('tmp_ok')}")
+
+    def _pulisci_browser(self, attivi=None):
+        if attivi is None:
+            attivi = list(self.browser_vars.keys())
+        home = os.path.expanduser("~")
+        percorsi = {
+            "chrome": [f"{home}/.cache/google-chrome",
+                       f"{home}/.config/google-chrome/Default/Cache",
+                       f"{home}/.config/google-chrome/Default/Code Cache",
+                       f"{home}/.config/google-chrome/Default/GPUCache"],
+            "chromium": [f"{home}/.cache/chromium",
+                         f"{home}/.config/chromium/Default/Cache",
+                         f"{home}/.config/chromium/Default/Code Cache",
+                         f"{home}/.config/chromium/Default/GPUCache"],
+            "edge": [f"{home}/.cache/microsoft-edge",
+                     f"{home}/.config/microsoft-edge/Default/Cache",
+                     f"{home}/.config/microsoft-edge/Default/Code Cache",
+                     f"{home}/.config/microsoft-edge/Default/GPUCache"],
+            "firefox": [f"{home}/.cache/mozilla/firefox",
+                        f"{home}/.mozilla/firefox/*/cache2",
+                        f"{home}/.mozilla/firefox/*/startupCache"],
+            "brave": [f"{home}/.cache/BraveSoftware",
+                      f"{home}/.config/BraveSoftware/Brave-Browser/Default/Cache",
+                      f"{home}/.config/BraveSoftware/Brave-Browser/Default/Code Cache",
+                      f"{home}/.config/BraveSoftware/Brave-Browser/Default/GPUCache"],
+            "opera": [f"{home}/.cache/opera",
+                      f"{home}/.config/opera/Cache",
+                      f"{home}/.config/opera/Code Cache"],
+        }
+        totale = 0
+        for nome in attivi:
+            lista = percorsi.get(nome, [])
+            rimossi = 0
+            for pat in lista:
+                for p in glob.glob(pat):
+                    if os.path.exists(p):
+                        try:
+                            if os.path.isdir(p):
+                                shutil.rmtree(p, ignore_errors=True)
+                                if "cache" in p.lower():
+                                    try:
+                                        os.makedirs(p, exist_ok=True)
+                                    except Exception:
+                                        pass
+                            else:
+                                os.remove(p)
+                            rimossi += 1
+                        except Exception:
+                            pass
+            if rimossi:
+                self._log(f"   ✅ {nome.capitalize()}: {rimossi}")
+                totale += rimossi
+            else:
+                self._log(f"   -- {nome.capitalize()}: nessuna cache")
+        if totale == 0:
+            self._log(f"   {_('browser_none')}")
+
+    def _pulisci_thumbnails(self):
+        home = os.path.expanduser("~")
+        p = os.path.join(home, ".cache", "thumbnails")
+        if os.path.exists(p):
+            try:
+                shutil.rmtree(p)
+                os.makedirs(p, exist_ok=True)
+                self._log(f"   {_('thumb_ok')}")
+            except Exception as e:
+                self._log(f"   ⚠️  {e}")
+        else:
+            self._log(f"   {_('thumb_none')}")
+
+    def _svuota_cestino(self):
+        home = os.path.expanduser("~")
+        percorsi = [
+            f"{home}/.local/share/Trash/files",
+            f"{home}/.local/share/Trash/info",
+            f"{home}/.local/share/Trash/expunged",
+            "/root/.local/share/Trash/files",
+            "/root/.local/share/Trash/info",
+        ]
+        dimensione = 0
+        for p in percorsi:
+            if os.path.exists(p):
+                for root, dirs, files in os.walk(p):
+                    for f in files:
+                        try:
+                            dimensione += os.path.getsize(
+                                os.path.join(root, f))
+                        except Exception:
+                            pass
+        rimossi = 0
+        for p in percorsi:
+            if os.path.exists(p):
+                try:
+                    if p.startswith("/root/"):
+                        self._esegui_comando(f"sudo rm -rf {p}/* 2>/dev/null")
+                    else:
+                        for el in os.listdir(p):
+                            full = os.path.join(p, el)
+                            try:
+                                if os.path.isdir(full):
+                                    shutil.rmtree(full, ignore_errors=True)
+                                else:
+                                    os.remove(full)
+                                rimossi += 1
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+        if dimensione > 0:
+            self._log(f"   {_('trash_ok')} "
+                      f"({self._bytes_a_human(dimensione)})")
+        elif rimossi > 0:
+            self._log(f"   {_('trash_ok')} ({rimossi} elementi)")
+        else:
+            self._log(f"   {_('trash_empty')}")
+
+    def _pulisci_apt_purge(self):
+        r = subprocess.run("dpkg -l | awk '/^rc/{print $2}'",
+                           shell=True, capture_output=True,
+                           text=True, timeout=15)
+        pacchetti = [p.strip() for p in (r.stdout or "").split("\n") if p.strip()]
+        if not pacchetti:
+            self._log(f"   {_('apt_purge_none')}")
+            return
+        self._log(f"   {_('apt_purge_found', len(pacchetti))}")
+        batch_size = 50
+        for i in range(0, len(pacchetti), batch_size):
+            batch = pacchetti[i:i + batch_size]
+            self._log(f"   {_('apt_purge_remove', ' '.join(batch[:3]))}"
+                      + ("..." if len(batch) > 3 else ""))
+            cmd = "sudo apt-get purge -y " + " ".join(batch)
+            ok, out = self._esegui_comando(cmd, timeout=600)
+            if ok:
+                self._log(f"      {_('apt_purge_done', len(batch))}")
+            else:
+                self._log(f"      ⚠️  {out[:200]}")
+
+    def _pulisci_deborphan(self):
+        if not shutil.which("deborphan"):
+            self._log(f"   {_('deborphan_none')}")
+            return
+        r = subprocess.run("deborphan", shell=True,
+                           capture_output=True, text=True, timeout=30)
+        librerie = [l.strip() for l in (r.stdout or "").split("\n") if l.strip()]
+        if not librerie:
+            self._log(f"   {_('deborphan_ok')}")
+            return
+        self._log(f"   {_('deborphan_found', len(librerie))}")
+        batch_size = 30
+        for i in range(0, len(librerie), batch_size):
+            batch = librerie[i:i + batch_size]
+            self._log(f"      - Rimozione {len(batch)} librerie...")
+            cmd = "sudo apt-get purge -y " + " ".join(batch)
+            ok, out = self._esegui_comando(cmd, timeout=600)
+            if not ok:
+                self._log(f"      ⚠️  {out[:200]}")
+        self._log(f"   {_('deborphan_ok')}")
+
+    def _pulisci_apt_lists(self):
+        self._log("   Eliminazione vecchie liste...")
+        ok, out = self._esegui_comando(
+            "sudo rm -rf /var/lib/apt/lists/*", timeout=60)
+        if not ok:
+            self._log(f"   {_('apt_lists_err')}: {out[:200]}")
+            return
+        self._log("   Download nuove liste (può richiedere 1-2 min)...")
+        ok, out = self._esegui_comando("sudo apt-get update", timeout=600)
+        if ok:
+            self._log(f"   {_('apt_lists_ok')}")
+        else:
+            self._log(f"   {_('apt_lists_err')}: {out[:200]}")
+
+    def _gestisci_kernel(self):
+        try:
+            r = subprocess.run(["uname", "-r"],
+                               capture_output=True, text=True, timeout=5)
+            kernel_attuale = r.stdout.strip()
+        except Exception:
+            self._log("   ⚠️  Impossibile rilevare kernel attuale")
+            return
+        self._log(f"   {_('kernels_current', kernel_attuale)}")
+        r = subprocess.run(
+            "dpkg --list | grep -E '^ii  linux-(image|headers|modules)' "
+            "| awk '{print $2}'",
+            shell=True, capture_output=True, text=True, timeout=15)
+        tutti = [k.strip() for k in (r.stdout or "").split("\n") if k.strip()]
+        self._log(f"   {_('kernels_found', len(tutti))}")
+        da_rimuovere = []
+        for pkg in tutti:
+            if kernel_attuale in pkg or kernel_attuale.replace("-generic", "") in pkg:
+                continue
+            da_rimuovere.append(pkg)
+        if da_rimuovere:
+            da_rimuovere = sorted(da_rimuovere)[:-1]
+        if not da_rimuovere:
+            self._log(f"   {_('kernels_none')}")
+            return
+        versioni = {}
+        for pkg in da_rimuovere:
+            for pref in ["linux-image-", "linux-headers-", "linux-modules-"]:
+                if pkg.startswith(pref):
+                    ver = pkg[len(pref):]
+                    versioni.setdefault(ver, []).append(pkg)
+                    break
+        for ver, pkgs in sorted(versioni.items()):
+            self._log(f"   {_('kernels_remove', ver)}")
+            cmd = "sudo apt-get purge -y " + " ".join(pkgs)
+            ok, out = self._esegui_comando(cmd, timeout=300)
+            if ok:
+                self._log(f"      ✅ OK")
+            else:
+                self._log(f"      ⚠️  {out[:200]}")
+
+    def _pulisci_flatpak(self):
+        """Rimuove runtime Flatpak inutilizzati."""
+        if not shutil.which("flatpak"):
+            self._log(f"   {_('flatpak_none')}")
+            return
+
+        # 1. Rimuovi runtime inutilizzati
+        self._log("   Ricerca runtime inutilizzati...")
+        ok, out = self._esegui_comando(
+            "flatpak uninstall --unused -y 2>&1", timeout=300)
+        if ok:
+            righe = [r for r in (out or "").split("\n") if r.strip()]
+            if righe:
+                for r in righe[-5:]:
+                    self._log(f"      {r}")
+                self._log(f"   {_('flatpak_ok')}")
+            else:
+                self._log(f"   {_('flatpak_none')}")
+        else:
+            self._log(f"   {_('flatpak_err')}: {out[:200]}")
+
+        # 2. Pulizia cache Flatpak (repo)
+        if os.path.exists(os.path.expanduser("~/.local/share/flatpak/repo")):
+            self._esegui_comando(
+                "flatpak repair --user 2>&1 | head -3",
+                timeout=120)
+
+    def _pulisci_docker(self):
+        """Rimuove container, immagini e volumi Docker inutilizzati."""
+        if not shutil.which("docker"):
+            self._log(f"   {_('docker_none')}")
+            return
+
+        # Verifica che il servizio sia attivo
+        r = subprocess.run(["systemctl", "is-active", "docker"],
+                           capture_output=True, text=True, timeout=5)
+        if r.stdout.strip() != "active":
+            self._log(f"   {_('docker_inactive')}")
+            return
+
+        # 1. Container fermi
+        self._log(f"   {_('docker_containers')}")
+        ok, out = self._esegui_comando(
+            "docker container prune -f 2>&1", timeout=120)
+        if ok:
+            for riga in (out or "").split("\n")[-3:]:
+                if riga.strip():
+                    self._log(f"      {riga}")
+
+        # 2. Immagini dangling
+        self._log(f"   {_('docker_images')}")
+        ok, out = self._esegui_comando(
+            "docker image prune -f 2>&1", timeout=180)
+        if ok:
+            for riga in (out or "").split("\n")[-3:]:
+                if riga.strip():
+                    self._log(f"      {riga}")
+
+        # 3. Volumi orfani
+        self._log(f"   {_('docker_volumes')}")
+        ok, out = self._esegui_comando(
+            "docker volume prune -f 2>&1", timeout=120)
+        if ok:
+            for riga in (out or "").split("\n")[-3:]:
+                if riga.strip():
+                    self._log(f"      {riga}")
+
+        # 4. Reti inutilizzate
+        self._log(f"   {_('docker_networks')}")
+        self._esegui_comando("docker network prune -f 2>&1", timeout=60)
+
+        self._log(f"   {_('docker_ok')}")
+
+    def _esegui_trim(self):
+        """Esegue TRIM sugli SSD."""
+        # Verifica che fstrim esista
+        if not shutil.which("fstrim"):
+            self._log(f"   {_('trim_none')}")
+            return
+
+        # Stato del timer
+        r = subprocess.run(
+            ["systemctl", "is-active", "fstrim.timer"],
+            capture_output=True, text=True, timeout=5)
+        stato = r.stdout.strip()
+        self._log(f"   {_('trim_timer', stato)}")
+
+        # Esegui TRIM su tutte le partizioni montate
+        self._log(f"   {_('trim_running')}")
+        ok, out = self._esegui_comando(
+            "sudo fstrim -av 2>&1", timeout=600)
+        if ok:
+            for riga in (out or "").split("\n"):
+                if riga.strip():
+                    self._log(f"      {riga}")
+            self._log(f"   {_('trim_ok')}")
+        else:
+            self._log(f"   {_('trim_err')}: {out[:200]}")
+
+    def _pulisci_recently_used(self):
+        """Rimuove la lista dei file recenti."""
+        home = os.path.expanduser("~")
+        file_recenti = [
+            f"{home}/.local/share/recently-used.xbel",
+            f"{home}/.local/share/recently-used.xbel.bak",
+        ]
+        rimossi = 0
+        dimensione = 0
+        for f in file_recenti:
+            if os.path.exists(f):
+                try:
+                    dimensione += os.path.getsize(f)
+                    os.remove(f)
+                    rimossi += 1
+                except Exception:
+                    pass
+
+        # Rimuovi anche cache di GNOME recent
+        cache_recent = f"{home}/.local/share/gnome-shell/application_state"
+        if os.path.exists(cache_recent):
+            try:
+                os.remove(cache_recent)
+                rimossi += 1
+            except Exception:
+                pass
+
+        if rimossi > 0:
+            self._log(f"   {_('recent_ok')} "
+                      f"({self._bytes_a_human(dimensione)})")
+        else:
+            self._log(f"   {_('recent_none')}")
+
+    # ------------------------------------------------------------------
+    # SHRED - CANCELLAZIONE SICURA
+    # ------------------------------------------------------------------
+    def apri_shred(self):
+        """Apre la finestra dello strumento Shred."""
+        win = tk.Toplevel(self.root)
+        win.title(_("shred_title"))
+        win.geometry("700x580")
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+        win.grab_set()
+
+        # --- Header ---
+        tk.Label(win, text=_("shred_title"),
+                 font=("Ubuntu", 15, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 4))
+
+        tk.Label(win, text=_("shred_desc"),
+                 font=("Ubuntu", 9, "italic"),
+                 bg=T("bg"), fg=T("fg_muted"),
+                 justify="center", wraplength=650).pack(pady=(0, 10))
+
+        # --- Sezione: file singolo ---
+        frame_file = tk.LabelFrame(
+            win, text=" " + _("shred_section_file") + " ",
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"),
+            bd=2, relief="groove")
+        frame_file.pack(fill=tk.X, padx=20, pady=6)
+
+        frame_file_inner = tk.Frame(frame_file, bg=T("bg_widget"))
+        frame_file_inner.pack(fill=tk.X, padx=10, pady=8)
+
+        self.shred_path_var = tk.StringVar()
+        entry_path = tk.Entry(
+            frame_file_inner, textvariable=self.shred_path_var,
+            font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
+            insertbackground=T("fg"), relief="flat", bd=3)
+        entry_path.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
+
+        tk.Button(frame_file_inner, text=_("shred_browse"),
+                  font=("Ubuntu", 9, "bold"),
+                  bg="#3498db", fg="white", relief="flat",
+                  cursor="hand2", width=10,
+                  command=lambda: self._shred_browse_file()
+                  ).pack(side=tk.LEFT, padx=2)
+
+        # --- Sezione: directory ---
+        frame_dir = tk.LabelFrame(
+            win, text=" " + _("shred_section_dir") + " ",
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"),
+            bd=2, relief="groove")
+        frame_dir.pack(fill=tk.X, padx=20, pady=6)
+
+        frame_dir_inner = tk.Frame(frame_dir, bg=T("bg_widget"))
+        frame_dir_inner.pack(fill=tk.X, padx=10, pady=8)
+
+        self.shred_dir_var = tk.StringVar()
+        entry_dir = tk.Entry(
+            frame_dir_inner, textvariable=self.shred_dir_var,
+            font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
+            insertbackground=T("fg"), relief="flat", bd=3)
+        entry_dir.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 6))
+
+        tk.Button(frame_dir_inner, text=_("shred_browse"),
+                  font=("Ubuntu", 9, "bold"),
+                  bg="#3498db", fg="white", relief="flat",
+                  cursor="hand2", width=10,
+                  command=lambda: self._shred_browse_dir()
+                  ).pack(side=tk.LEFT, padx=2)
+
+        # --- Opzioni ---
+        frame_opt = tk.LabelFrame(
+            win, text=" " + _("shred_section_opts") + " ",
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"),
+            bd=2, relief="groove")
+        frame_opt.pack(fill=tk.X, padx=20, pady=6)
+
+        self.shred_passes_var = tk.IntVar(value=3)
+        self.shred_zero_var = tk.BooleanVar(value=True)
+        self.shred_remove_var = tk.BooleanVar(value=True)
+
+        frame_opt_inner = tk.Frame(frame_opt, bg=T("bg_widget"))
+        frame_opt_inner.pack(fill=tk.X, padx=10, pady=8)
+
+        riga1 = tk.Frame(frame_opt_inner, bg=T("bg_widget"))
+        riga1.pack(fill=tk.X, pady=2)
+        tk.Label(riga1, text=_("shred_passes"),
+                 font=("Ubuntu", 10),
+                 bg=T("bg_widget"), fg=T("fg")).pack(side=tk.LEFT)
+        tk.Spinbox(riga1, from_=1, to=35,
+                   textvariable=self.shred_passes_var, width=5,
+                   font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
+                   buttonbackground=T("bg"),
+                   insertbackground=T("fg"),
+                   relief="flat").pack(side=tk.LEFT, padx=8)
+        tk.Label(riga1, text=_("shred_passes_hint"),
+                 font=("Ubuntu", 8, "italic"),
+                 bg=T("bg_widget"), fg=T("fg_muted")).pack(side=tk.LEFT)
+
+        tk.Checkbutton(frame_opt_inner, text=_("shred_zero"),
+                       variable=self.shred_zero_var,
+                       font=("Ubuntu", 10),
+                       bg=T("bg_widget"), fg=T("fg"),
+                       selectcolor=T("select_bg"),
+                       activebackground=T("bg_widget"),
+                       activeforeground=T("accent"),
+                       anchor="w").pack(fill=tk.X, pady=2)
+
+        tk.Checkbutton(frame_opt_inner, text=_("shred_remove"),
+                       variable=self.shred_remove_var,
+                       font=("Ubuntu", 10),
+                       bg=T("bg_widget"), fg=T("fg"),
+                       selectcolor=T("select_bg"),
+                       activebackground=T("bg_widget"),
+                       activeforeground=T("accent"),
+                       anchor="w").pack(fill=tk.X, pady=2)
+
+        # --- Warning ---
+        tk.Label(win, text=_("shred_warning"),
+                 font=("Ubuntu", 9, "bold"),
+                 bg=T("bg"), fg=T("error"),
+                 justify="center", wraplength=650).pack(pady=6, padx=20)
+
+        # --- Output log ---
+        frame_log = tk.LabelFrame(
+            win, text=" " + _("shred_section_log") + " ",
+            font=("Ubuntu", 10, "bold"),
+            bg=T("bg_widget"), fg=T("fg"),
+            bd=2, relief="groove")
+        frame_log.pack(fill=tk.BOTH, expand=True, padx=20, pady=6)
+
+        self.shred_log = tk.Text(
+            frame_log, wrap=tk.WORD, font=("Ubuntu Mono", 9),
+            bg=T("bg_text"), fg=T("fg"),
+            insertbackground=T("fg"),
+            relief="flat", height=6)
+        self.shred_log.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+
+        # --- Pulsanti azione ---
+        frame_btn = tk.Frame(win, bg=T("bg"))
+        frame_btn.pack(pady=10)
+
+        self.btn_shred_file = tk.Button(
+            frame_btn, text=_("shred_btn_file"),
+            font=("Ubuntu", 10, "bold"),
+            bg="#c0392b", fg="white", activebackground="#e74c3c",
+            activeforeground="white", relief="flat",
+            cursor="hand2", width=18, height=2,
+            command=lambda: self._shred_esegui("file", win))
+        self.btn_shred_file.pack(side=tk.LEFT, padx=4)
+
+        self.btn_shred_dir = tk.Button(
+            frame_btn, text=_("shred_btn_dir"),
+            font=("Ubuntu", 10, "bold"),
+            bg="#c0392b", fg="white", activebackground="#e74c3c",
+            activeforeground="white", relief="flat",
+            cursor="hand2", width=18, height=2,
+            command=lambda: self._shred_esegui("dir", win))
+        self.btn_shred_dir.pack(side=tk.LEFT, padx=4)
+
+        tk.Button(frame_btn, text=_("shred_close"),
+                  font=("Ubuntu", 10, "bold"),
+                  bg="#7f8c8d", fg="white", relief="flat",
+                  cursor="hand2", width=12, height=2,
+                  command=win.destroy).pack(side=tk.LEFT, padx=4)
+
+        win.bind("<Escape>", lambda e: win.destroy())
+
+    def _shred_browse_file(self):
+        """Apre dialog per selezionare un file."""
+        percorso = filedialog.askopenfilename(
+            title=_("shred_browse_file_title"))
+        if percorso:
+            self.shred_path_var.set(percorso)
+
+    def _shred_browse_dir(self):
+        """Apre dialog per selezionare una directory."""
+        percorso = filedialog.askdirectory(
+            title=_("shred_browse_dir_title"))
+        if percorso:
+            self.shred_dir_var.set(percorso)
+
+    def _shred_log(self, testo):
+        """Aggiunge una riga al log shred."""
+        try:
+            self.shred_log.insert(tk.END, testo + "\n")
+            self.shred_log.see(tk.END)
+            self.shred_log.update_idletasks()
+        except Exception:
+            pass
+
+    def _shred_esegui(self, modo, finestra):
+        """Esegue lo shred su file o directory."""
+        # Verifica che shred esista
+        if not shutil.which("shred"):
+            messagebox.showerror(_("error_title"),
+                                 _("shred_not_available"))
+            return
+
+        # Ottieni il percorso
+        if modo == "file":
+            percorso = self.shred_path_var.get().strip()
+            etichetta = _("shred_file")
+        else:
+            percorso = self.shred_dir_var.get().strip()
+            etichetta = _("shred_dir")
+
+        if not percorso:
+            messagebox.showwarning(_("shred_title"),
+                                   _("shred_no_path"))
+            return
+
+        if not os.path.exists(percorso):
+            messagebox.showerror(_("error_title"),
+                                 _("shred_not_exists", percorso))
+            return
+
+        # Conta elementi
+        if modo == "file":
+            n_elementi = 1
+            dimensione = os.path.getsize(percorso)
+        else:
+            n_elementi = 0
+            dimensione = 0
+            for root, dirs, files in os.walk(percorso):
+                for f in files:
+                    n_elementi += 1
+                    try:
+                        dimensione += os.path.getsize(os.path.join(root, f))
+                    except Exception:
+                        pass
+
+        # Conferma esplicita
+        msg = _("shred_confirm_msg",
+                etichetta, percorso, n_elementi,
+                self._bytes_a_human(dimensione))
+        if not messagebox.askyesno(_("shred_confirm_title"), msg):
+            return
+
+        # Pulisci log
+        try:
+            self.shred_log.delete("1.0", tk.END)
+        except Exception:
+            pass
+
+        # Disabilita pulsanti
+        self.btn_shred_file.config(state=tk.DISABLED)
+        self.btn_shred_dir.config(state=tk.DISABLED)
+
+        # Esegui in thread separato
+        threading.Thread(
+            target=self._shred_worker,
+            args=(modo, percorso, finestra),
+            daemon=True
+        ).start()
+
+    def _shred_worker(self, modo, percorso, finestra):
+        """Worker thread per lo shred."""
+        try:
+            passes = self.shred_passes_var.get()
+            zero = self.shred_zero_var.get()
+            remove = self.shred_remove_var.get()
+
+            self._shred_log("=" * 60)
+            self._shred_log(f"  SHRED - {datetime.now().strftime('%H:%M:%S')}")
+            self._shred_log("=" * 60)
+            self._shred_log(f"Percorso: {percorso}")
+            self._shred_log(f"Passaggi: {passes}")
+            self._shred_log(f"Aggiungi zero: {zero}")
+            self._shred_log(f"Rimuovi file: {remove}")
+            self._shred_log("")
+
+            # Costruisci comando shred
+            flags = [f"-n {passes}"]
+            if zero:
+                flags.append("-z")
+            if remove:
+                flags.append("-u")
+            flags_str = " ".join(flags)
+
+            file_list = []
+            if modo == "file":
+                file_list.append(percorso)
+            else:
+                for root, dirs, files in os.walk(percorso):
+                    for f in files:
+                        file_list.append(os.path.join(root, f))
+
+            totale = len(file_list)
+            self._shred_log(f"Elementi da cancellare: {totale}")
+            self._shred_log("")
+
+            completati = 0
+            errori_count = 0
+
+            for file_path in file_list:
+                completati += 1
+                nome = os.path.basename(file_path)
+
+                # Usa sudo per file di root
+                cmd_prefix = ""
+                if not os.access(file_path, os.W_OK):
+                    cmd_prefix = "sudo "
+
+                cmd = f'{cmd_prefix}shred {flags_str} "{file_path}" 2>&1'
+                ok, out = self._esegui_comando(cmd, timeout=600)
+
+                if ok:
+                    self._shred_log(f"[{completati}/{totale}] ✅ {nome}")
+                else:
+                    errori_count += 1
+                    self._shred_log(f"[{completati}/{totale}] ⚠️  {nome}: {out[:100]}")
+
+            # Rimuovi directory se era dir mode
+            if modo == "dir" and os.path.exists(percorso):
+                self._shred_log("")
+                self._shred_log("Rimozione directory...")
+                cmd_prefix = ""
+                if not os.access(percorso, os.W_OK):
+                    cmd_prefix = "sudo "
+                self._esegui_comando(
+                    f'{cmd_prefix}rm -rf "{percorso}" 2>&1', timeout=300)
+
+            self._shred_log("")
+            self._shred_log("=" * 60)
+            if errori_count == 0:
+                self._shred_log(f"✅ COMPLETATO - {completati} file cancellati")
+            else:
+                self._shred_log(f"⚠️  COMPLETATO con {errori_count} errori")
+            self._shred_log("=" * 60)
+
+            # Notifica
+            self._invia_notifica(
+                _("shred_notif_title"),
+                _("shred_notif_msg", completati))
+
+        except Exception as e:
+            self._shred_log(f"\n❌ ERRORE: {e}")
+        finally:
+            try:
+                self.btn_shred_file.config(state=tk.NORMAL)
+                self.btn_shred_dir.config(state=tk.NORMAL)
+            except Exception:
+                pass
+
+    def _pulisci_dev_cache(self):
+        """Pulisce le cache degli strumenti di sviluppo."""
+        home = os.path.expanduser("~")
+        totale = 0
+
+        # --- pip ---
+        if shutil.which("pip") or shutil.which("pip3"):
+            pip_cmd = "pip" if shutil.which("pip") else "pip3"
+            ok, out = self._esegui_comando(f"{pip_cmd} cache purge 2>&1",
+                                          timeout=120)
+            if ok:
+                self._log(f"   ✅ pip cache")
+                totale += 1
+            else:
+                self._log(f"   -- pip: non disponibile")
+
+        # --- npm ---
+        if shutil.which("npm"):
+            ok, out = self._esegui_comando(
+                "npm cache clean --force 2>&1", timeout=180)
+            if ok:
+                self._log(f"   ✅ npm cache")
+                totale += 1
+
+        # --- yarn ---
+        if shutil.which("yarn"):
+            ok, out = self._esegui_comando(
+                "yarn cache clean 2>&1", timeout=180)
+            if ok:
+                self._log(f"   ✅ yarn cache")
+                totale += 1
+
+        # --- cargo ---
+        if shutil.which("cargo"):
+            # Prova con cargo-cache, altrimenti rimuovi manualmente
+            if shutil.which("cargo-cache"):
+                ok, out = self._esegui_comando(
+                    "cargo cache -a 2>&1", timeout=300)
+                if ok:
+                    self._log(f"   ✅ cargo cache")
+                    totale += 1
+            else:
+                cargo_dir = f"{home}/.cargo/registry/cache"
+                if os.path.exists(cargo_dir):
+                    try:
+                        shutil.rmtree(cargo_dir)
+                        os.makedirs(cargo_dir, exist_ok=True)
+                        self._log(f"   ✅ cargo registry cache")
+                        totale += 1
+                    except Exception:
+                        pass
+
+        # --- gem ---
+        if shutil.which("gem"):
+            ok, out = self._esegui_comando("gem cleanup 2>&1", timeout=180)
+            if ok:
+                self._log(f"   ✅ gem cleanup")
+                totale += 1
+
+        # --- composer ---
+        if shutil.which("composer"):
+            ok, out = self._esegui_comando(
+                "composer clear-cache 2>&1", timeout=120)
+            if ok:
+                self._log(f"   ✅ composer cache")
+                totale += 1
+
+        # --- go ---
+        if shutil.which("go"):
+            ok, out = self._esegui_comando(
+                "go clean -modcache 2>&1", timeout=300)
+            if ok:
+                self._log(f"   ✅ go modcache")
+                totale += 1
+
+        if totale == 0:
+            self._log(f"   {_('dev_cache_none')}")
+
+    def _pulisci_multimedia(self):
+        """Pulisce cache di player e client multimediali."""
+        home = os.path.expanduser("~")
+        percorsi = {
+            "Thunderbird": [
+                f"{home}/.cache/thunderbird",
+                f"{home}/.thunderbird/*/ImapMail/*/INBOX.msf",
+            ],
+            "Spotify": [
+                f"{home}/.cache/spotify",
+                f"{home}/.config/spotify/Users/*/Cache",
+            ],
+            "VLC": [
+                f"{home}/.cache/vlc",
+            ],
+            "MPV": [
+                f"{home}/.cache/mpv",
+            ],
+            "Rhythmbox": [
+                f"{home}/.cache/rhythmbox",
+            ],
+            "Totem": [
+                f"{home}/.cache/totem",
+            ],
+            "digiKam": [
+                f"{home}/.cache/digikam",
+            ],
+            "Shotwell": [
+                f"{home}/.cache/shotwell",
+            ],
+            "gThumb": [
+                f"{home}/.cache/gthumb",
+                f"{home}/.local/share/gthumb",
+            ],
+            "Cheese": [
+                f"{home}/.cache/cheese",
+            ],
+        }
+
+        totale = 0
+        for nome, lista in percorsi.items():
+            rimossi = 0
+            for pat in lista:
+                for p in glob.glob(pat):
+                    if os.path.exists(p):
+                        try:
+                            if os.path.isdir(p):
+                                shutil.rmtree(p, ignore_errors=True)
+                                try:
+                                    os.makedirs(p, exist_ok=True)
+                                except Exception:
+                                    pass
+                            else:
+                                os.remove(p)
+                            rimossi += 1
+                        except Exception:
+                            pass
+            if rimossi:
+                self._log(f"   ✅ {nome}: {rimossi}")
+                totale += rimossi
+
+        if totale == 0:
+            self._log(f"   {_('multimedia_none')}")
+
+    def _pulisci_steam(self):
+        """Pulisce le cache shader e di download di Steam."""
+        home = os.path.expanduser("~")
+        percorsi = [
+            f"{home}/.steam/steam/steamapps/shadercache",
+            f"{home}/.local/share/Steam/steamapps/shadercache",
+            f"{home}/.steam/steam/steamapps/downloading",
+            f"{home}/.local/share/Steam/steamapps/downloading",
+            f"{home}/.steam/steam/appcache/httpcache",
+            f"{home}/.local/share/Steam/appcache/httpcache",
+            f"{home}/.steam/steam/logs",
+            f"{home}/.local/share/Steam/logs",
+            f"{home}/.steam/steam/steamapps/temp",
+            f"{home}/.local/share/Steam/steamapps/temp",
+        ]
+
+        trovato = False
+        for p in percorsi:
+            if os.path.exists(p):
+                trovato = True
+                try:
+                    for elemento in os.listdir(p):
+                        full = os.path.join(p, elemento)
+                        try:
+                            if os.path.isdir(full):
+                                shutil.rmtree(full, ignore_errors=True)
+                            else:
+                                os.remove(full)
+                        except Exception:
+                            pass
+                    self._log(f"   ✅ {p}")
+                except Exception as e:
+                    self._log(f"   ⚠️  {p}: {e}")
+
+        if not trovato:
+            self._log(f"   {_('steam_none')}")
+
+    def _pulisci_symlinks(self):
+        """Rimuove i link simbolici rotti nella home."""
+        home = os.path.expanduser("~")
+
+        # Trova symlink rotti
+        r = subprocess.run(
+            f'find {home} -xtype l 2>/dev/null | head -500',
+            shell=True, capture_output=True, text=True, timeout=120)
+
+        rotti = [l.strip() for l in (r.stdout or "").split("\n") if l.strip()]
+
+        if not rotti:
+            self._log(f"   {_('symlinks_none')}")
+            return
+
+        self._log(f"   {_('symlinks_found', len(rotti))}")
+
+        rimossi = 0
+        for link in rotti:
+            try:
+                os.remove(link)
+                rimossi += 1
+            except Exception:
+                pass
+
+        self._log(f"   ✅ {rimossi} link rimossi")
+
+    def _pulisci_emptydirs(self):
+        """Rimuove le cartelle vuote nella home (escluse quelle di sistema)."""
+        home = os.path.expanduser("~")
+
+        # Escludi le directory di sistema critiche
+        esclusioni = [
+            ".cache", ".config", ".local", ".ssh", ".gnome",
+            ".mozilla", ".thunderbird", "snap", ".steam",
+            ".cargo", ".npm", ".gradle", ".m2", ".gem",
+        ]
+
+        # Trova cartelle vuote escludendo quelle di sistema
+        cmd = f'find {home} -mindepth 1 -type d -empty 2>/dev/null'
+        r = subprocess.run(cmd, shell=True, capture_output=True,
+                           text=True, timeout=120)
+
+        vuote = [l.strip() for l in (r.stdout or "").split("\n") if l.strip()]
+
+        # Filtra quelle di sistema
+        filtrate = []
+        for d in vuote:
+            # Salta se contiene una directory di sistema
+            if any(f"/{exc}" in d for exc in esclusioni):
+                continue
+            filtrate.append(d)
+
+        # Rimuovi solo se non rischioso (evita prime 2 settimane)
+        if not filtrate:
+            self._log(f"   {_('emptydirs_none')}")
+            return
+
+        self._log(f"   {_('emptydirs_found', len(filtrate))}")
+
+        # Rimuovi dal più profondo per evitare errori
+        filtrate.sort(key=lambda x: -x.count("/"))
+
+        rimossi = 0
+        for d in filtrate:
+            try:
+                os.rmdir(d)
+                rimossi += 1
+            except Exception:
+                pass
+
+        self._log(f"   ✅ {rimossi} cartelle rimosse")
+
+    def analizza_disco(self):
+        win = tk.Toplevel(self.root)
+        win.title(_("disk_title"))
+        win.geometry("660x580")
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+
+        tk.Label(win, text=_("disk_title"), font=("Ubuntu", 15, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 5))
+        lbl_stato = tk.Label(win, text=_("disk_analyzing"),
+                             font=("Ubuntu", 10, "italic"),
+                             bg=T("bg"), fg=T("accent"))
+        lbl_stato.pack(pady=4)
+
+        frame_txt = tk.Frame(win, bg=T("bg"))
+        frame_txt.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+
+        txt = tk.Text(frame_txt, wrap=tk.NONE, font=("Ubuntu Mono", 9),
+                      bg=T("bg_text"), fg=T("fg"), relief="flat")
+        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb = tk.Scrollbar(frame_txt, command=txt.yview, width=12,
+                          relief="flat", bd=0)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        txt.config(yscrollcommand=sb.set)
+
+        txt.insert(tk.END, f"{_('disk_path'):<45} {_('disk_size'):>12}\n")
+        txt.insert(tk.END, "-" * 60 + "\n")
+
+        def analizza():
+            home = os.path.expanduser("~")
+            percorsi = [
+                ("/var/log", "/var/log"),
+                ("/var/cache/apt", "/var/cache/apt"),
+                ("/var/cache", "/var/cache"),
+                ("/var/lib/snapd", "/var/lib/snapd"),
+                ("/var/lib/docker", "/var/lib/docker"),
+                ("/usr/lib", "/usr/lib"),
+                ("/usr/share", "/usr/share"),
+                ("/opt", "/opt"),
+                (f"{home}/.cache", "~/.cache"),
+                (f"{home}/.local/share/Trash", "~/.local/share/Trash"),
+                (f"{home}/Downloads", "~/Downloads"),
+                (f"{home}/.mozilla", "~/.mozilla"),
+                (f"{home}/.config/google-chrome", "~/.config/google-chrome"),
+                (f"{home}/.config/BraveSoftware", "~/.config/BraveSoftware"),
+                ("/tmp", "/tmp"),
+                ("/snap", "/snap"),
+            ]
+            risultati = []
+            for percorso, etichetta in percorsi:
+                if not os.path.exists(percorso):
+                    continue
+                try:
+                    r = subprocess.run(["du", "-sb", percorso],
+                                       capture_output=True, text=True,
+                                       timeout=60)
+                    if r.returncode == 0:
+                        size = int(r.stdout.split()[0])
+                        risultati.append((etichetta, size))
+                except Exception:
+                    pass
+            risultati.sort(key=lambda x: x[1], reverse=True)
+            for etichetta, size in risultati:
+                txt.insert(tk.END, f"{etichetta:<45} "
+                                   f"{self._bytes_a_human(size):>12}\n")
+            totale = sum(r[1] for r in risultati)
+            txt.insert(tk.END, "-" * 60 + "\n")
+            txt.insert(tk.END, f"{_('disk_total'):<45} "
+                               f"{self._bytes_a_human(totale):>12}\n")
+            lbl_stato.config(text=_("disk_done"), fg=T("success"))
+
+        threading.Thread(target=analizza, daemon=True).start()
+        tk.Button(win, text=_("disk_close"), font=("Ubuntu", 10, "bold"),
+                  bg="#7f8c8d", fg="white", relief="flat", width=14,
+                  cursor="hand2", command=win.destroy).pack(pady=10)
+
+    # ------------------------------------------------------------------
+    # STATISTICHE STORICHE
+    # ------------------------------------------------------------------
+    def _salva_statistica(self, liberato):
+        """Salva una statistica in stats.json."""
+        try:
+            os.makedirs(STATS_DIR, exist_ok=True)
+            stats = {"pulizie": []}
+            if os.path.exists(STATS_FILE):
+                try:
+                    with open(STATS_FILE, encoding="utf-8") as f:
+                        stats = json.load(f)
+                except Exception:
+                    stats = {"pulizie": []}
+
+            stats["pulizie"].append({
+                "data": datetime.now().isoformat(),
+                "liberato": liberato,
+                "durata": 0,
+            })
+
+            with open(STATS_FILE, "w", encoding="utf-8") as f:
+                json.dump(stats, f, indent=2, ensure_ascii=False)
+
+            debug_log(f"Statistica salvata: {liberato} byte")
+        except Exception as e:
+            debug_log(f"Errore salvataggio statistica: {e}")
+
+    def _carica_statistiche(self):
+        """Carica le statistiche da stats.json."""
+        if not os.path.exists(STATS_FILE):
+            return []
+        try:
+            with open(STATS_FILE, encoding="utf-8") as f:
+                stats = json.load(f)
+            return stats.get("pulizie", [])
+        except Exception:
+            return []
+
+    def mostra_statistiche(self):
+        """Mostra la finestra delle statistiche con grafico."""
+        pulizie = self._carica_statistiche()
+
+        win = tk.Toplevel(self.root)
+        win.title(_("stats_title"))
+        win.geometry("900x650")
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+
+        tk.Label(win, text=_("stats_title"), font=("Ubuntu", 15, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 6))
+
+        if not pulizie:
+            tk.Label(win, text=_("stats_no_data"),
+                     font=("Ubuntu", 12),
+                     bg=T("bg"), fg=T("fg_muted"),
+                     justify="center").pack(expand=True, pady=50)
+            tk.Button(win, text=_("stats_close"), font=("Ubuntu", 10, "bold"),
+                      bg="#7f8c8d", fg="white", relief="flat", width=14,
+                      cursor="hand2", command=win.destroy).pack(pady=15)
+            return
+
+        # --- Statistiche riassuntive ---
+        frame_stats = tk.Frame(win, bg=T("bg_widget"))
+        frame_stats.pack(fill=tk.X, padx=20, pady=8)
+
+        totale = sum(p["liberato"] for p in pulizie)
+        media = totale // len(pulizie)
+        ultima = pulizie[-1]["data"][:19].replace("T", " ")
+        prima = pulizie[0]["data"][:19].replace("T", " ")
+
+        righe = [
+            (_("stats_total"), str(len(pulizie))),
+            (_("stats_freed_total"), self._bytes_a_human(totale)),
+            (_("stats_avg"), self._bytes_a_human(media)),
+            (_("stats_first"), prima),
+            (_("stats_last"), ultima),
+        ]
+        for etichetta, valore in righe:
+            r = tk.Frame(frame_stats, bg=T("bg_widget"))
+            r.pack(fill=tk.X, padx=15, pady=2)
+            tk.Label(r, text=f"{etichetta}:", font=("Ubuntu", 10, "bold"),
+                     bg=T("bg_widget"), fg=T("fg_muted"),
+                     width=25, anchor="w").pack(side=tk.LEFT)
+            tk.Label(r, text=valore, font=("Ubuntu", 10),
+                     bg=T("bg_widget"), fg=T("fg"),
+                     anchor="w").pack(side=tk.LEFT)
+
+        # --- Grafico ---
+        frame_graph = tk.Frame(win, bg=T("bg"))
+        frame_graph.pack(fill=tk.BOTH, expand=True, padx=20, pady=8)
+
+        try:
+            import matplotlib
+            matplotlib.use("TkAgg")
+            from matplotlib.figure import Figure
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+            fig = Figure(figsize=(9, 3.5), dpi=100, facecolor="#2c3e50")
+            ax = fig.add_subplot(111, facecolor="#1c2833")
+
+            # Mostra ultime 20 pulizie
+            dati = pulizie[-20:]
+            x = list(range(len(dati)))
+            y = [d["liberato"] / (1024 * 1024) for d in dati]  # MB
+            labels = [d["data"][5:10] for d in dati]  # MM-GG
+
+            ax.plot(x, y, marker="o", color="#27ae60",
+                    linewidth=2, markersize=6, markerfacecolor="#2ecc71")
+            ax.fill_between(x, y, alpha=0.2, color="#27ae60")
+
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, rotation=45, ha="right",
+                               color="#ecf0f1", fontsize=8)
+            ax.set_ylabel("MB", color="#ecf0f1")
+            ax.tick_params(axis="y", colors="#ecf0f1")
+            ax.spines["bottom"].set_color("#7f8c8d")
+            ax.spines["left"].set_color("#7f8c8d")
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(axis="y", linestyle="--", alpha=0.3, color="#7f8c8d")
+            ax.set_title(_("stats_chart_title"), color="#ecf0f1",
+                         fontsize=11, fontweight="bold")
+            fig.tight_layout()
+
+            canvas = FigureCanvasTkAgg(fig, master=frame_graph)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        except ImportError:
+            tk.Label(frame_graph, text=_("graph_no_mpl"),
+                     font=("Ubuntu", 10), bg=T("bg"), fg=T("accent"),
+                     justify="center").pack(expand=True)
+
+        # --- Pulsanti ---
+        frame_btn = tk.Frame(win, bg=T("bg"))
+        frame_btn.pack(pady=10)
+
+        def azzera():
+            if not messagebox.askyesno(_("stats_title"),
+                                       _("stats_reset_confirm")):
+                return
+            try:
+                os.remove(STATS_FILE)
+                messagebox.showinfo(_("stats_title"),
+                                    "✅ Statistiche azzerate")
+                win.destroy()
+                self.mostra_statistiche()
+            except Exception as e:
+                messagebox.showerror(_("error_title"), str(e))
+
+        tk.Button(frame_btn, text=_("stats_reset"),
+                  font=("Ubuntu", 10, "bold"),
+                  bg="#c0392b", fg="white", relief="flat", width=18,
+                  height=2, cursor="hand2",
+                  command=azzera).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(frame_btn, text=_("stats_close"),
+                  font=("Ubuntu", 10, "bold"),
+                  bg="#7f8c8d", fg="white", relief="flat", width=14,
+                  height=2, cursor="hand2",
+                  command=win.destroy).pack(side=tk.LEFT, padx=5)
+
+        win.bind("<Escape>", lambda e: win.destroy())
+
+    def salva_report(self):
+        if not self.report_lines:
+            return
+        nome = f"report_pulizia_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        percorso = filedialog.asksaveasfilename(
+            title=_("save_dialog_title"), initialfile=nome,
+            defaultextension=".txt",
+            filetypes=[("Testo", "*.txt"), ("Tutti", "*.*")])
+        if not percorso:
+            return
+        try:
+            with open(percorso, "w", encoding="utf-8") as f:
+                f.write("\n".join(self.report_lines))
+            messagebox.showinfo("OK", _("save_ok", percorso))
+        except Exception as e:
+            messagebox.showerror(_("error_title"), str(e))
+
+    def copia_report(self):
+        if not self.report_lines:
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append("\n".join(self.report_lines))
+        messagebox.showinfo("OK", _("copy_ok"))
+
+    def apri_guida(self):
+        win = tk.Toplevel(self.root)
+        win.title(_("help_title"))
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+        win.minsize(800, 560)
+
+        tk.Label(win, text=_("help_title"), font=("Ubuntu", 15, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(12, 6))
+
+        frame_main = tk.Frame(win, bg=T("bg"))
+        frame_main.pack(fill=tk.BOTH, expand=True, padx=15, pady=5)
+
+        frame_index = tk.Frame(frame_main, bg=T("bg_widget"), width=210)
+        frame_index.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+        frame_index.pack_propagate(False)
+        tk.Label(frame_index, text=_("help_index"),
+                 font=("Ubuntu", 10, "bold"),
+                 bg=T("bg_widget"), fg=T("fg")).pack(pady=6)
+
+        listbox = tk.Listbox(frame_index, font=("Ubuntu", 10),
+                             bg=T("bg_text"), fg=T("fg"),
+                             selectbackground="#27ae60",
+                             selectforeground="white",
+                             relief="flat", bd=0, highlightthickness=0,
+                             activestyle="none", cursor="hand2")
+        listbox.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
+
+        frame_content = tk.Frame(frame_main, bg=T("bg"))
+        frame_content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        txt = tk.Text(frame_content, wrap=tk.WORD, font=("Ubuntu", 10),
+                      bg=T("bg_text"), fg=T("fg"),
+                      insertbackground="white", relief="flat",
+                      padx=15, pady=12, cursor="arrow")
+        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb = tk.Scrollbar(frame_content, command=txt.yview, width=12,
+                          relief="flat", bd=0)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        txt.config(yscrollcommand=sb.set)
+
+        txt.tag_configure("section", font=("Ubuntu", 14, "bold"),
+                          foreground="#2ecc71", spacing1=15, spacing3=8)
+        txt.tag_configure("body", font=("Ubuntu", 10),
+                          foreground="#ecf0f1",
+                          lmargin1=10, lmargin2=10, spacing1=3, spacing3=3)
+        txt.tag_configure("bullet", font=("Ubuntu", 10),
+                          foreground="#f39c12",
+                          lmargin1=25, lmargin2=40, spacing1=2, spacing3=2)
+        txt.tag_configure("code", font=("Ubuntu Mono", 9),
+                          foreground="#1abc9c", background="#2c3e50",
+                          lmargin1=40, lmargin2=40, spacing1=1, spacing3=1)
+
+        sezioni = GUIDE_CONTENT.get(CURRENT_LANG, GUIDE_CONTENT["en"])
+        markers = []
+        for titolo, contenuto in sezioni:
+            marker = f"sec_{len(markers)}"
+            txt.mark_set(marker, tk.END)
+            markers.append(marker)
+            txt.insert(tk.END, f"> {titolo}\n", "section")
+            for riga in contenuto.strip().split("\n"):
+                if not riga.strip():
+                    txt.insert(tk.END, "\n")
+                elif riga.strip()[:1] in "*-" or \
+                        riga.strip()[:2] in ("D:", "R:", "Q:", "A:"):
+                    txt.insert(tk.END, "  " + riga + "\n", "bullet")
+                elif riga.strip().startswith(("sudo", "systemctl", "cat ",
+                                              "/usr", "groups", "apt-",
+                                              "/etc", "/var", "rm ",
+                                              "notify-", "grep", "python3",
+                                              "du ")):
+                    txt.insert(tk.END, "      " + riga.strip() + "\n", "code")
+                else:
+                    txt.insert(tk.END, riga + "\n", "body")
+            txt.insert(tk.END, "\n")
+            listbox.insert(tk.END, f"  {titolo}")
+
+        def vai(event=None):
+            sel = listbox.curselection()
+            if sel and 0 <= sel[0] < len(markers):
+                txt.see(markers[sel[0]])
+        listbox.bind("<<ListboxSelect>>", vai)
+        listbox.bind("<Return>", vai)
+        listbox.selection_set(0)
+
+        tk.Button(win, text=_("help_close"), font=("Ubuntu", 10, "bold"),
+                  bg="#7f8c8d", fg="white", relief="flat", width=14,
+                  height=2, cursor="hand2",
+                  command=win.destroy).pack(pady=10)
+        win.bind("<Escape>", lambda e: win.destroy())
+
+        win.update_idletasks()
+        win.geometry("")
+        win.update_idletasks()
+        larg = max(win.winfo_reqwidth(), 820)
+        alt = max(win.winfo_reqheight(), 620)
+        sw = win.winfo_screenwidth()
+        sh = win.winfo_screenheight()
+        win.geometry(f"{larg}x{alt}+{(sw-larg)//2}+{(sh-alt)//2}")
+        win.focus_set()
+
+    def _cron_service_attivo(self):
+        try:
+            r = subprocess.run(["systemctl", "is-active", "cron"],
+                               capture_output=True, text=True, timeout=5)
+            s = (r.stdout or "").strip().lower()
+            if s == "active":
+                return True
+            if s in ("inactive", "failed", "deactivating"):
+                return False
+            r2 = subprocess.run(["systemctl", "is-enabled", "cron"],
+                                capture_output=True, text=True, timeout=5)
+            e = (r2.stdout or "").strip().lower()
+            if e == "enabled":
+                return True
+            if e in ("disabled", "masked"):
+                return False
+            return None
+        except Exception:
+            return None
+
+    def apri_schedulazione(self):
+        cron_file = "/etc/cron.d/pulizia-ubuntu"
+        win = tk.Toplevel(self.root)
+        win.title(_("sched_title"))
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+        win.grab_set()
+        win.resizable(False, False)
+        win.minsize(560, 620)
+
+        tk.Label(win, text=_("sched_title"), font=("Ubuntu", 15, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(15, 5))
+        tk.Label(win, text=_("sched_desc"), font=("Ubuntu", 9, "italic"),
+                 bg=T("bg"), fg=T("fg_muted"),
+                 justify="center").pack(pady=(0, 10))
+
+        fs = tk.LabelFrame(win, text=" " + _("sched_service_title") + " ",
+                           font=("Ubuntu", 10, "bold"),
+                           bg=T("bg_widget"), fg=T("fg"), bd=2, relief="groove")
+        fs.pack(fill=tk.X, padx=20, pady=6)
+
+        cron_attivo = self._cron_service_attivo()
+        if cron_attivo is None:
+            t_serv, c_serv = _("sched_service_unknown"), "#e67e22"
+        elif cron_attivo:
+            t_serv, c_serv = _("sched_service_active"), "#2ecc71"
+        else:
+            t_serv, c_serv = _("sched_service_inactive"), "#e74c3c"
+
+        lbl_serv = tk.Label(fs, text=t_serv, font=("Ubuntu", 10, "bold"),
+                            bg=T("bg_widget"), fg=c_serv, anchor="w")
+        lbl_serv.pack(fill=tk.X, padx=10, pady=(8, 2))
+
+        voce = os.path.exists(cron_file)
+        t_voce = _("sched_entry_active") if voce else _("sched_entry_inactive")
+        c_voce = "#2ecc71" if voce else "#95a5a6"
+        lbl_voce = tk.Label(fs, text=t_voce, font=("Ubuntu", 10, "bold"),
+                            bg=T("bg_widget"), fg=c_voce, anchor="w")
+        lbl_voce.pack(fill=tk.X, padx=10, pady=(2, 8))
+
+        fb = tk.Frame(fs, bg=T("bg_widget"))
+        fb.pack(pady=(0, 10), padx=10, fill=tk.X)
+
+        def agg_stato():
+            a = self._cron_service_attivo()
+            if a is None:
+                lbl_serv.config(text=_("sched_service_unknown"), fg=T("accent"))
+            elif a:
+                lbl_serv.config(text=_("sched_service_active"), fg=T("success"))
+            else:
+                lbl_serv.config(text=_("sched_service_inactive"), fg=T("error"))
+            if os.path.exists(cron_file):
+                lbl_voce.config(text=_("sched_entry_active"), fg=T("success"))
+            else:
+                lbl_voce.config(text=_("sched_entry_inactive"), fg=T("fg_muted"))
+            btn_en.config(state=tk.NORMAL if a is False else tk.DISABLED)
+            btn_di.config(state=tk.NORMAL if a is True else tk.DISABLED)
+
+        def abilita():
+            if not self._assicura_sudo():
+                return
+            ok, out = self._esegui_comando("sudo systemctl enable --now cron")
+            if ok:
+                messagebox.showinfo(_("sched_service_title"),
+                                    _("sched_service_enabled"))
+                agg_stato()
+            else:
+                messagebox.showerror(_("error_title"), out)
+
+        def disabilita():
+            if not messagebox.askyesno(_("confirm_title"),
+                                       _("sched_service_disable_confirm")):
+                return
+            if not self._assicura_sudo():
+                return
+            ok, out = self._esegui_comando(
+                "sudo systemctl stop cron && sudo systemctl disable cron")
+            if ok:
+                messagebox.showinfo(_("sched_service_title"),
+                                    _("sched_service_disabled"))
+                agg_stato()
+            else:
+                messagebox.showerror(_("error_title"), out)
+
+        btn_en = tk.Button(fb, text=_("sched_service_enable"),
+                           font=("Ubuntu", 9, "bold"),
+                           bg="#27ae60", fg="white", relief="flat",
+                           cursor="hand2", width=18, command=abilita)
+        btn_di = tk.Button(fb, text=_("sched_service_disable"),
+                           font=("Ubuntu", 9, "bold"),
+                           bg="#c0392b", fg="white", relief="flat",
+                           cursor="hand2", width=18, command=disabilita)
+        btn_en.pack(side=tk.LEFT, padx=5)
+        btn_di.pack(side=tk.LEFT, padx=5)
+        if cron_attivo is True:
+            btn_en.config(state=tk.DISABLED)
+        elif cron_attivo is False:
+            btn_di.config(state=tk.DISABLED)
+
+        fc = tk.LabelFrame(win, text=" " + _("sched_config_title") + " ",
+                           font=("Ubuntu", 10, "bold"),
+                           bg=T("bg_widget"), fg=T("fg"), bd=2, relief="groove")
+        fc.pack(fill=tk.X, padx=20, pady=6)
+        inner = tk.Frame(fc, bg=T("bg_widget"))
+        inner.pack(padx=15, pady=10, fill=tk.X)
+
+        tk.Label(inner, text=_("sched_freq") + ":",
+                 font=("Ubuntu", 10, "bold"),
+                 bg=T("bg_widget"), fg=T("fg")).grid(
+            row=0, column=0, sticky="w", pady=(4, 2))
+        freq_var = tk.StringVar(value="weekly")
+        ffr = tk.Frame(inner, bg=T("bg_widget"))
+        ffr.grid(row=1, column=0, columnspan=2, sticky="w", padx=20,
+                 pady=(0, 8))
+        for val, key in [("daily", "sched_daily"),
+                         ("weekly", "sched_weekly"),
+                         ("monthly", "sched_monthly")]:
+            tk.Radiobutton(ffr, text=_(key), variable=freq_var, value=val,
+                           font=("Ubuntu", 10),
+                           bg=T("bg_widget"), fg=T("fg"),
+                           selectcolor="#34495e",
+                           activebackground="#34495e",
+                           activeforeground="#1abc9c",
+                           anchor="w", cursor="hand2").pack(fill=tk.X, pady=1)
+
+        tk.Label(inner, text=_("sched_time") + ":",
+                 font=("Ubuntu", 10, "bold"),
+                 bg=T("bg_widget"), fg=T("fg")).grid(
+            row=2, column=0, sticky="w", pady=(4, 2))
+        ora_var = tk.StringVar(value="3")
+        tk.Spinbox(inner, from_=0, to=23, textvariable=ora_var, width=5,
+                   font=("Ubuntu", 10), bg=T("bg_text"), fg=T("fg"),
+                   buttonbackground="#2c3e50", relief="flat",
+                   insertbackground="white").grid(
+            row=2, column=1, sticky="w", padx=8, pady=(4, 2))
+
+        tk.Label(inner, text=_("sched_day") + ":",
+                 font=("Ubuntu", 10, "bold"),
+                 bg=T("bg_widget"), fg=T("fg")).grid(
+            row=3, column=0, sticky="w", pady=(4, 2))
+        giorni = [("0", "sched_sun"), ("1", "sched_mon"), ("2", "sched_tue"),
+                  ("3", "sched_wed"), ("4", "sched_thu"), ("5", "sched_fri"),
+                  ("6", "sched_sat")]
+        combo = ttk.Combobox(inner, state="readonly", width=20,
+                             font=("Ubuntu", 10),
+                             values=[f"{g[0]} - {_(g[1])}" for g in giorni])
+        combo.current(1)
+        combo.grid(row=3, column=1, sticky="w", padx=8, pady=(4, 2))
+
+        tk.Label(win, text=_("sched_note"), font=("Ubuntu", 8, "italic"),
+                 bg=T("bg"), fg=T("fg_muted"), wraplength=520,
+                 justify="left").pack(pady=6, padx=20)
+
+        def salva():
+            freq = freq_var.get()
+            try:
+                ora = int(ora_var.get())
+                if not 0 <= ora <= 23:
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror(_("error_title"), _("sched_err_time"))
+                return
+            gt = combo.get()
+            g = gt.split(" - ")[0] if " - " in gt else "0"
+            if freq == "daily":
+                expr = f"0 {ora} * * *"
+            elif freq == "weekly":
+                expr = f"0 {ora} * * {g}"
+            else:
+                expr = f"0 {ora} 1 * *"
+            if not self._assicura_sudo():
+                return
+            self._installa_cron(expr, win)
+
+        def rimuovi():
+            if not os.path.exists(cron_file):
+                messagebox.showinfo(_("sched_title"),
+                                    _("sched_entry_inactive"))
+                return
+            if not messagebox.askyesno(_("sched_remove_confirm_title"),
+                                       _("sched_remove_confirm_msg")):
+                return
+            if not self._assicura_sudo():
+                return
+            self._rimuovi_cron(win)
+
+        fbt = tk.Frame(win, bg=T("bg"))
+        fbt.pack(pady=10)
+        tk.Button(fbt, text=_("sched_save"), font=("Ubuntu", 10, "bold"),
+                  bg="#27ae60", fg="white", relief="flat", width=14,
+                  height=2, cursor="hand2", command=salva).pack(
+            side=tk.LEFT, padx=4)
+        tk.Button(fbt, text=_("sched_remove"), font=("Ubuntu", 10, "bold"),
+                  bg="#c0392b", fg="white", relief="flat", width=14,
+                  height=2, cursor="hand2", command=rimuovi).pack(
+            side=tk.LEFT, padx=4)
+        tk.Button(fbt, text=_("sched_close"), font=("Ubuntu", 10),
+                  bg="#7f8c8d", fg="white", relief="flat", width=10,
+                  height=2, cursor="hand2", command=win.destroy).pack(
+            side=tk.LEFT, padx=4)
+
+        win.update_idletasks()
+        win.geometry("")
+        win.update_idletasks()
+        larg = max(win.winfo_reqwidth(), 560)
+        alt = max(win.winfo_reqheight(), 620)
+        sw = win.winfo_screenwidth()
+        sh = win.winfo_screenheight()
+        win.geometry(f"{larg}x{alt}+{(sw-larg)//2}+{(sh-alt)//2}")
+
+    def _installa_cron(self, espressione, finestra):
+        script_content = r'''#!/bin/bash
+LOG=/var/log/pulizia_ubuntu.log
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Inizio pulizia ===" >> "$LOG"
+PRIMA=$(df -B1 / | tail -1 | awk '{print $4}')
+apt-get autoremove --purge -y >> "$LOG" 2>&1
+apt-get clean >> "$LOG" 2>&1
+apt-get autoclean >> "$LOG" 2>&1
+journalctl --vacuum-time=3d >> "$LOG" 2>&1
+if command -v snap &>/dev/null; then
+    snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | \
+    while read nome rev; do
+        [ -n "$nome" ] && [ -n "$rev" ] && \
+            snap remove "$nome" --revision="$rev" >> "$LOG" 2>&1
+    done
+fi
+find /tmp -type f -atime +7 -delete 2>/dev/null
+find /var/tmp -type f -atime +30 -delete 2>/dev/null
+for pkg in $(dpkg -l | awk '/^rc/{print $2}'); do
+    apt-get purge -y "$pkg" >> "$LOG" 2>&1
+done
+DOPO=$(df -B1 / | tail -1 | awk '{print $4}')
+LIBERATO=$(( DOPO - PRIMA ))
+if [ "$LIBERATO" -gt 0 ]; then
+    LIB=$(numfmt --to=iec --suffix=B "$LIBERATO" 2>/dev/null || echo "${LIBERATO}B")
+else
+    LIB="0B"
+fi
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Completata. Liberati: $LIB" >> "$LOG"
+UTENTE=$(who | grep -v root | head -1 | awk '{print $1}')
+if [ -n "$UTENTE" ]; then
+    UID_U=$(id -u "$UTENTE" 2>/dev/null)
+    DISP=$(who | grep "^$UTENTE " | grep -o ':[0-9.]*' | head -1)
+    [ -z "$DISP" ] && DISP=":0"
+    [ -n "$UID_U" ] && runuser -u "$UTENTE" -- env DISPLAY="$DISP" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$UID_U/bus" \
+        notify-send -i pulizia-ubuntu -a "Pulizia Ubuntu" -t 10000 \
+        "Pulizia automatica completata" "Spazio liberato: $LIB" 2>/dev/null
+fi
+echo "" >> "$LOG"
+'''
+        try:
+            tmp = "/tmp/pulizia_cron_tmp.sh"
+            with open(tmp, "w") as f:
+                f.write(script_content)
+            os.chmod(tmp, 0o755)
+        except Exception as e:
+            messagebox.showerror(_("error_title"), str(e))
+            return
+        ok, out = self._esegui_comando(
+            f"sudo mv {tmp} /usr/local/bin/pulizia_ubuntu_cron.sh && "
+            f"sudo chmod 755 /usr/local/bin/pulizia_ubuntu_cron.sh")
+        if not ok:
+            messagebox.showerror(_("error_title"), out)
+            return
+        cron_content = ("# Pulizia automatica Ubuntu\n"
+                        "SHELL=/bin/bash\n"
+                        "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:"
+                        "/usr/sbin:/usr/bin\n"
+                        f"{espressione} root "
+                        "/usr/local/bin/pulizia_ubuntu_cron.sh\n")
+        try:
+            tmp_c = "/tmp/pulizia_cron_tmp.cron"
+            with open(tmp_c, "w") as f:
+                f.write(cron_content)
+        except Exception as e:
+            messagebox.showerror(_("error_title"), str(e))
+            return
+        ok, out = self._esegui_comando(
+            f"sudo mv {tmp_c} /etc/cron.d/pulizia-ubuntu && "
+            f"sudo chmod 644 /etc/cron.d/pulizia-ubuntu")
+        if not ok:
+            messagebox.showerror(_("error_title"), out)
+            return
+        messagebox.showinfo(_("sched_ok_title"),
+                            _("sched_ok_msg", espressione))
+        finestra.destroy()
+
+    def _rimuovi_cron(self, finestra):
+        ok, out = self._esegui_comando(
+            "sudo rm -f /etc/cron.d/pulizia-ubuntu "
+            "/usr/local/bin/pulizia_ubuntu_cron.sh")
+        if ok:
+            messagebox.showinfo(_("sched_removed_title"),
+                                _("sched_removed_msg"))
+            finestra.destroy()
+        else:
+            messagebox.showerror(_("error_title"), out)
+
+    def _invia_notifica(self, titolo, messaggio):
+        try:
+            subprocess.Popen(
+                ["notify-send", "-i", "pulizia-ubuntu", "-a", APP_NAME,
+                 "-t", "8000", titolo, messaggio],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            debug_log(f"notify err: {e}")
+
+    def _set_pulsanti(self, abilitato):
+        stato = tk.NORMAL if abilitato else tk.DISABLED
+        self.btn_esegui.config(state=stato)
+        self.btn_esci.config(state=stato)
+        self.btn_menu.config(state=stato)
+        self.btn_guida.config(state=stato)
+
+    def esci(self):
+        if self.in_esecuzione:
+            messagebox.showwarning("⏳", _("exit_running"))
+            return
+        if messagebox.askyesno(_("exit_title"), _("exit_msg")):
+            self.password_sudo = None
+            self.root.destroy()
+
+
+if __name__ == "__main__":
+    debug_log("--- Avvio main ---")
+    root = tk.Tk()
+    app = PuliziaApp(root)
+    root.mainloop()
+    debug_log("--- Chiusura app ---")

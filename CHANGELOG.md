@@ -1,3 +1,21 @@
+## [5.2] - 2026-11-05
+
+### Aggiunto
+- 🎨 Popup modale con progress bar durante la pulizia
+- Percentuale di avanzamento in tempo reale
+- Operazione corrente mostrata nel popup
+
+### Modificato
+- Progress bar rimossa dalla finestra principale
+- Status label spostata nel popup
+
+### Rimosso
+- Progress bar e label dalla UI principale (più pulita)
+
+## [5.1] - 2026-11-05
+
+### Nota
+- Commit "fantasma": conteneva solo la descrizione, non il codice (patch non applicata correttamente)
 # Changelog
 
 Tutte le modifiche importanti di questo progetto sono documentate qui.

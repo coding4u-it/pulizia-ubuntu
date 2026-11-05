@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "5.0"
+APP_VERSION = "5.2"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -304,6 +304,7 @@ TRANSLATIONS = {
         "symlinks_found": "Trovati {0} link simbolici rotti",
         "emptydirs_none": "ℹ️  Nessuna cartella vuota",
         "emptydirs_found": "Trovate {0} cartelle vuote",
+        "popup_title": "🧹 Pulizia in corso...",
         "lang_label": "🌍 Lingua:",
         "notif_title": "🧹 Pulizia completata",
         "notif_msg": "Spazio liberato: {0}",
@@ -552,6 +553,7 @@ TRANSLATIONS = {
         "symlinks_found": "Found {0} broken symlinks",
         "emptydirs_none": "ℹ️  No empty directories",
         "emptydirs_found": "Found {0} empty directories",
+        "popup_title": "🧹 Cleanup in progress...",
         "lang_label": "🌍 Language:",
         "notif_title": "🧹 Cleanup completed",
         "notif_msg": "Space freed: {0}",
@@ -823,6 +825,10 @@ class PuliziaApp:
         self.spazio_dopo = 0
         self.totale_disco = 0
         self.in_esecuzione = False
+        self.popup_window = None
+        self.popup_progress = None
+        self.popup_label = None
+        self.popup_percent = None
         self.password_sudo = None
         self.ui_queue = queue.Queue()
 
@@ -1100,14 +1106,6 @@ class PuliziaApp:
             command=self.esci)
         self.btn_esci.pack(side=tk.LEFT, padx=4)
 
-        self.progress = ttk.Progressbar(self.root, orient="horizontal",
-                                        length=740, mode="determinate")
-        self.progress.pack(pady=6, padx=20, fill=tk.X)
-
-        self.lbl_stato = tk.Label(self.root, text=_("status_ready"),
-                                  font=("Ubuntu", 10),
-                                  bg=T("bg"), fg=T("accent"))
-        self.lbl_stato.pack(pady=4)
 
         # Report rimosso dalla finestra principale (vedi _mostra_report_finale)
 
@@ -1229,10 +1227,18 @@ class PuliziaApp:
             while True:
                 tipo, payload = self.ui_queue.get_nowait()
                 if tipo == "stato":
-                    self.lbl_stato.config(text=payload)
-                elif tipo == "progress":
-                    self.progress["value"] = payload
-                elif tipo == "abilita_pulsanti":
+                    if self.popup_label:
+                        self.popup_label.config(text=payload)
+                    if self.popup_progress:
+                        self.popup_progress["value"] = payload
+                elif tipo == "percentuale":
+                    if self.popup_percent:
+                        self.popup_percent.config(text=payload)
+                elif tipo == "chiudi_popup":
+                    if self.popup_window:
+                        self.popup_window.destroy()
+                        self.popup_window = None
+                        self.popup_progress = None
                     self._set_pulsanti(payload)
                 elif tipo == "info":
                     messagebox.showinfo(*payload)
@@ -1439,6 +1445,7 @@ class PuliziaApp:
 
     def _set_progress(self, valore):
         self.ui_queue.put(("progress", valore))
+        self.ui_queue.put(("percentuale", f"{int(valore)}%"))
 
     def _bytes_a_human(self, b):
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -1562,6 +1569,43 @@ class PuliziaApp:
             messagebox.showerror(_("error_title"), str(e))
             return False
 
+    def _crea_popup_progress(self):
+        """Crea la finestra popup con progress bar e stato."""
+        win = tk.Toplevel(self.root)
+        win.title(_("popup_title"))
+        win.geometry("500x220")
+        win.configure(bg=T("bg"))
+        win.transient(self.root)
+        win.resizable(False, False)
+        win.update_idletasks()
+        x = (win.winfo_screenwidth() // 2) - 250
+        y = (win.winfo_screenheight() // 2) - 110
+        win.geometry(f"+{x}+{y}")
+        win.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        tk.Label(win, text=_("popup_title"),
+                 font=("Ubuntu", 14, "bold"),
+                 bg=T("bg"), fg=T("fg")).pack(pady=(15, 10))
+
+        self.popup_label = tk.Label(
+            win, text=_("status_ready"),
+            font=("Ubuntu", 10),
+            bg=T("bg"), fg=T("accent"),
+            wraplength=450, justify="center")
+        self.popup_label.pack(pady=5)
+
+        self.popup_progress = ttk.Progressbar(
+            win, orient="horizontal", length=420, mode="determinate")
+        self.popup_progress.pack(pady=15, padx=30, fill=tk.X)
+
+        self.popup_percent = tk.Label(
+            win, text="0%",
+            font=("Ubuntu", 11, "bold"),
+            bg=T("bg"), fg=T("success"))
+        self.popup_percent.pack()
+
+        self.popup_window = win
+
     def avvia_pulizia(self):
         if self.in_esecuzione:
             return
@@ -1572,6 +1616,7 @@ class PuliziaApp:
         self.in_esecuzione = True
         self._set_pulsanti(False)
         self.report_lines = []
+        self._crea_popup_progress()
         self._set_progress(0)
         threading.Thread(target=self._esegui_pulizia, daemon=True).start()
 
@@ -1735,6 +1780,7 @@ class PuliziaApp:
         finally:
             self.in_esecuzione = False
             self.ui_queue.put(("abilita_pulsanti", True))
+            self.ui_queue.put(("chiudi_popup", True))
 
     def _pulisci_snap(self):
         if not shutil.which("snap"):
