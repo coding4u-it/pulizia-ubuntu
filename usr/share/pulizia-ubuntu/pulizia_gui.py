@@ -8,7 +8,7 @@ import subprocess, threading, os, shutil, tempfile, glob, queue, json
 from datetime import datetime
 
 APP_NAME = "Pulizia Ubuntu"
-APP_VERSION = "5.2"
+APP_VERSION = "5.3"
 LOG_FILE = os.path.join(tempfile.gettempdir(), "pulizia_ubuntu_debug.log")
 STATS_FILE = os.path.expanduser("~/.local/share/pulizia-ubuntu/stats.json")
 
@@ -1261,6 +1261,15 @@ class PuliziaApp:
         win.minsize(720, 620)
         win.configure(bg=T("bg"))
         win.transient(self.root)
+        win.update_idletasks()
+        self.root.update_idletasks()
+        rx = self.root.winfo_rootx()
+        ry = self.root.winfo_rooty()
+        rw = self.root.winfo_width()
+        rh = self.root.winfo_height()
+        x = rx + (rw - 820) // 2
+        y = ry + (rh - 760) // 2
+        win.geometry(f"+{x}+{y}")
 
         # ============================================================
         # HEADER
@@ -1506,8 +1515,15 @@ class PuliziaApp:
         dialog.grab_set()
         dialog.resizable(False, False)
         dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - 220
-        y = (dialog.winfo_screenheight() // 2) - 115
+        self.root.update_idletasks()
+        rx = self.root.winfo_rootx()
+        ry = self.root.winfo_rooty()
+        rw = self.root.winfo_width()
+        rh = self.root.winfo_height()
+        ww = dialog.winfo_reqwidth()
+        wh = dialog.winfo_reqheight()
+        x = rx + (rw - ww) // 2
+        y = ry + (rh - wh) // 2
         dialog.geometry(f"+{x}+{y}")
 
         tk.Label(dialog, text=_("pwd_title"), font=("Ubuntu", 13, "bold"),
@@ -1578,8 +1594,15 @@ class PuliziaApp:
         win.transient(self.root)
         win.resizable(False, False)
         win.update_idletasks()
-        x = (win.winfo_screenwidth() // 2) - 250
-        y = (win.winfo_screenheight() // 2) - 110
+        self.root.update_idletasks()
+        rx = self.root.winfo_rootx()
+        ry = self.root.winfo_rooty()
+        rw = self.root.winfo_width()
+        rh = self.root.winfo_height()
+        ww = win.winfo_reqwidth()
+        wh = win.winfo_reqheight()
+        x = rx + (rw - ww) // 2
+        y = ry + (rh - wh) // 2
         win.geometry(f"+{x}+{y}")
         win.protocol("WM_DELETE_WINDOW", lambda: None)
 
@@ -3110,9 +3133,17 @@ class PuliziaApp:
         win.update_idletasks()
         larg = max(win.winfo_reqwidth(), 820)
         alt = max(win.winfo_reqheight(), 620)
-        sw = win.winfo_screenwidth()
-        sh = win.winfo_screenheight()
-        win.geometry(f"{larg}x{alt}+{(sw-larg)//2}+{(sh-alt)//2}")
+        self.root.update_idletasks()
+        win.update_idletasks()
+        rx = self.root.winfo_rootx()
+        ry = self.root.winfo_rooty()
+        rw = self.root.winfo_width()
+        rh = self.root.winfo_height()
+        ww = win.winfo_reqwidth()
+        wh = win.winfo_reqheight()
+        x = rx + (rw - ww) // 2
+        y = ry + (rh - wh) // 2
+        win.geometry(f"{ww}x{wh}+{x}+{y}")
         win.focus_set()
 
     def _cron_service_attivo(self):
