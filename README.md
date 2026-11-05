@@ -1,106 +1,106 @@
-# 🧹 Pulizia Ubuntu
+# 🧹 Ubuntu Cleanup
 
-> 🌍 [Read this in English](README.en.md)
+> 🇮🇹 [Leggi in italiano](README.md)
 
 <div align="center">
 
-![Anteprima](https://raw.githubusercontent.com/coding4u-it/pulizia-ubuntu/main/screenshot.png)
+![Preview](https://raw.githubusercontent.com/coding4u-it/pulizia-ubuntu/main/screenshot.png)
 
-[![Version](https://img.shields.io/badge/version-5.0-blue)](https://github.com/coding4u-it/pulizia-ubuntu/releases)
+[![Version](https://img.shields.io/badge/version-5.1-blue)](https://github.com/coding4u-it/pulizia-ubuntu/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/coding4u-it/pulizia-ubuntu/blob/main/LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Ubuntu-orange)](https://ubuntu.com/)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org/)
 
-**Applicazione grafica per la manutenzione e la pulizia di Ubuntu**
+**Graphical application for Ubuntu maintenance and cleanup**
 
-*22 operazioni di pulizia, 5 temi, multilingua IT/EN, schedulazione automatica*
+*22 cleanup operations, 5 themes, IT/EN multilingual, automatic scheduling*
 
 </div>
 
 ---
 
-## ✨ Funzionalità
+## ✨ Features
 
-### 🌐 Browser
-- Pulizia cache di **Chrome, Chromium, Edge, Firefox, Brave, Opera** (selezionabili singolarmente)
+### 🌐 Browsers
+- Cache cleanup for **Chrome, Chromium, Edge, Firefox, Brave, Opera** (individually selectable)
 
-### ⚙️ Sistema
-- Rimozione pacchetti orfani (`apt autoremove`)
-- Pulizia cache APT
-- Pulizia log systemd (mantiene ultimi 3 giorni)
-- Rimozione vecchie revisioni Snap
-- Pulizia file temporanei (`/tmp`, `/var/tmp`)
-- Pulizia anteprime (thumbnails)
-- Svuotamento cestino
-- Pulizia config orfane (`apt purge rc`)
-- Pulizia file recenti (`recently-used`)
+### ⚙️ System
+- Remove orphan packages (`apt autoremove`)
+- APT cache cleanup
+- systemd log cleanup (keeps last 3 days)
+- Remove old Snap revisions
+- Temporary file cleanup (`/tmp`, `/var/tmp`)
+- Thumbnail cleanup
+- Empty trash
+- Orphan config cleanup (`apt purge rc`)
+- Recently-used files cleanup
 
-### 💻 Sviluppatori
-- Pulizia cache **pip, npm, yarn, cargo, gem, composer, go**
+### 💻 Developers
+- Cache cleanup for **pip, npm, yarn, cargo, gem, composer, go**
 
 ### 🎬 Multimedia
-- Pulizia cache **Thunderbird, Spotify, VLC, MPV, Rhythmbox, digiKam, Shotwell, gThumb, Cheese**
+- Cache cleanup for **Thunderbird, Spotify, VLC, MPV, Rhythmbox, digiKam, Shotwell, gThumb, Cheese**
 
 ### 🎮 Gaming
-- Pulizia cache **Steam** (shader, download, log)
+- **Steam** cache cleanup (shader, download, logs)
 
-### 🚀 Avanzate
-- Rimozione librerie orfane (`deborphan`)
-- Rigenerazione liste APT
-- Pulizia runtime **Flatpak**
-- Pulizia **Docker** (container, immagini, volumi, reti)
-- Esecuzione **TRIM SSD**
-- Rimozione **vecchi kernel**
-- Rimozione **link simbolici rotti**
-- Rimozione **cartelle vuote**
+### 🚀 Advanced
+- Remove orphan libraries (`deborphan`)
+- Regenerate APT lists
+- **Flatpak** runtime cleanup
+- **Docker** cleanup (containers, images, volumes, networks)
+- **SSD TRIM** execution
+- Remove **old kernels**
+- Remove **broken symlinks**
+- Remove **empty directories**
 
-### 🛠 Strumenti integrati
-- 📊 **Analisi spazio disco** interattiva
-- 📈 **Statistiche storiche** con grafico dell'andamento
-- ⏱ **Schedulazione cron** con controllo servizio
-- 🔐 **Shred** per cancellazione sicura (1-35 passaggi)
-- 📖 **Guida in linea** (F1)
-- 🎨 **5 temi**: dark, light, nord, dracula, solarized
+### 🛠 Built-in tools
+- 📊 Interactive **disk space analysis**
+- 📈 **Historical statistics** with trend chart
+- ⏱ **Cron scheduling** with service status control
+- 🔐 **Shred** for secure deletion (1-35 passes)
+- 📖 **Online help** (F1)
+- 🎨 **5 themes**: dark, light, nord, dracula, solarized
 
-### 🌍 Multilingua
-- Italiano 🇮🇹
+### 🌍 Multilingual
+- Italian 🇮🇹
 - English 🇬🇧
 
-### 📊 Report e notifiche
-- Report dettagliato nella finestra finale
-- Notifica desktop al termine
-- Grafico spazio disco prima/dopo
-- Salvataggio/copia report
+### 📊 Report and notifications
+- Detailed report in the final window
+- Desktop notification when done
+- Disk space chart before/after
+- Save/copy report
 
 ---
 
-## 🚀 Installazione
+## 🚀 Installation
 
-### Da pacchetto `.deb` (consigliato)
+### From `.deb` package (recommended)
 
 ```bash
-# Scarica l'ultima release
+# Download the latest release
 wget https://github.com/coding4u-it/pulizia-ubuntu/releases/latest/download/pulizia-ubuntu-5.0.deb
 
-# Installa (con gdebi per risolvere dipendenze)
+# Install (with gdebi to resolve dependencies)
 sudo apt install gdebi -y
 sudo gdebi pulizia-ubuntu-5.0.deb
 
-# Avvia dal menu applicazioni o da terminale
+# Launch from applications menu or terminal
 pulizia-ubuntu
 ```
 
-### Da sorgente
+### From source
 
 ```bash
-# Clona il repository
+# Clone the repository
 git clone https://github.com/coding4u-it/pulizia-ubuntu.git
 cd pulizia-ubuntu
 
-# Installa le dipendenze
+# Install dependencies
 sudo apt install python3-tk python3-pil python3-matplotlib libnotify-bin -y
 
-# Avvia l'applicazione
+# Launch the application
 python3 usr/share/pulizia-ubuntu/pulizia_gui.py
 ```
 
@@ -108,196 +108,192 @@ python3 usr/share/pulizia-ubuntu/pulizia_gui.py
 
 ## 📸 Screenshot
 
-### Tema scuro (default)
-![Screenshot tema scuro](screenshot.png)
-
-### Temi disponibili
-- 🎨 **dark** — Default, elegante
-- ☀️ **light** — Chiaro, per ambienti luminosi
-- ❄️ **nord** — Blu notte, riposante
-- 🧛 **dracula** — Contrastato, vivace
-- 🌅 **solarized** — Classico, basso contrasto
+![Screenshot](screenshot.png)
 
 ---
 
-## 🛠 Requisiti
+## 🛠 Requirements
 
-- **Ubuntu** 22.04 LTS o superiore (testato su 26.04)
+- **Ubuntu** 22.04 LTS or newer (tested on 26.04)
 - **Python** 3.10+
-- **Dipendenze**:
-  - `python3-tk` — interfaccia grafica
-  - `python3-pil` — gestione icone
-  - `python3-matplotlib` — grafico spazio disco
-  - `libnotify-bin` — notifiche desktop
+- **Dependencies**:
+  - `python3-tk` — graphical interface
+  - `python3-pil` — icon management
+  - `python3-matplotlib` — disk space chart
+  - `libnotify-bin` — desktop notifications
 
-### Dipendenze opzionali
+### Optional dependencies
 
 ```bash
-# Per abilitare funzionalità extra:
-sudo apt install deborphan -y      # Rimozione librerie orfane
-sudo apt install cron -y            # Schedulazione automatica
-sudo apt install docker.io -y       # Pulizia Docker
-sudo apt install flatpak -y         # Pulizia runtime Flatpak
-sudo apt install fdupes -y          # (futuro) Ricerca duplicati
+# To enable extra features:
+sudo apt install deborphan -y      # Orphan library removal
+sudo apt install cron -y            # Automatic scheduling
+sudo apt install docker.io -y       # Docker cleanup
+sudo apt install flatpak -y         # Flatpak runtime cleanup
 ```
 
 ---
 
-## 📖 Utilizzo
+## 📖 Usage
 
-### 1. Avvia l'app
+### 1. Launch the app
 
-Dal menu applicazioni cerca **"Pulizia Ubuntu"** oppure:
+Search for **"Ubuntu Cleanup"** in your applications menu or run:
 
 ```bash
 pulizia-ubuntu
 ```
 
-### 2. Seleziona le opzioni
+### 2. Select options
 
-Le opzioni sono organizzate in 3 gruppi collassabili:
-- 🌐 **Browser** — quali browser pulire
-- ⚙️ **Sistema** — operazioni di base
-- 🚀 **Avanzate** — operazioni rischiose
+Options are organized into 3 collapsible groups:
+- 🌐 **Browsers** — which browsers to clean
+- ⚙️ **System** — basic operations
+- 🚀 **Advanced** — risky operations
 
-### 3. Esegui pulizia
+### 3. Run cleanup
 
-Clicca **▶ Esegui Pulizia** e inserisci la password sudo quando richiesto.
+Click **▶ Run Cleanup** and enter the sudo password when prompted.
 
-### 4. Visualizza il report
+### 4. View the report
 
-Al termine si apre una finestra con:
-- Grafico spazio liberato
-- Report completo
-- Pulsanti Salva/Copia
-
----
-
-## 🎯 Menu Strumenti
-
-Dal menu **🔧 Strumenti ▼** puoi accedere a:
-
-| Strumento | Descrizione |
-|-----------|-------------|
-| ⏱ **Schedulazione** | Programma pulizie automatiche via cron |
-| 📊 **Analisi disco** | Mostra directory più pesanti |
-| 📈 **Statistiche** | Storico pulizie con grafico |
-| 🔐 **Shred** | Cancellazione sicura irreversibile |
+When done, a window opens with:
+- Freed space chart
+- Complete report
+- Save/Copy buttons
 
 ---
 
-## 🎨 Cambio tema
+## 🎯 Tools Menu
 
-In alto a destra c'è il selettore tema. La scelta viene salvata e ricordata al prossimo avvio.
+From the **🔧 Tools ▼** menu you can access:
 
-**File di preferenze**: `~/.config/pulizia-ubuntu/settings.json`
+| Tool | Description |
+|------|-------------|
+| ⏱ **Scheduling** | Schedule automatic cleanups via cron |
+| 📊 **Disk analysis** | Show heaviest directories |
+| 📈 **Statistics** | Cleanup history with chart |
+| 🔐 **Shred** | Irreversible secure deletion |
+
+---
+
+## 🎨 Theme switching
+
+The theme selector is in the top-right corner. Available themes:
+- 🎨 **dark** — Default, elegant
+- ☀️ **light** — Light, for bright environments
+- ❄️ **nord** — Night blue, restful
+- 🧛 **dracula** — Contrasted, vibrant
+- 🌅 **solarized** — Classic, low contrast
+
+Your choice is saved in `~/.config/pulizia-ubuntu/settings.json`:
 
 ```json
 {
-  "lang": "it",
+  "lang": "en",
   "theme": "dark"
 }
 ```
 
 ---
 
-## ⏱ Schedulazione automatica
+## ⏱ Automatic scheduling
 
-Il pulsante **Schedulazione** permette di:
+The **Scheduling** button allows you to:
 
-- 🟢 **Abilitare/disabilitare** il servizio cron
-- 📅 **Configurare** frequenza (giornaliera/settimanale/mensile)
-- 🕐 **Scegliere ora e giorno**
-- 🗑 **Rimuovere** la schedulazione
+- 🟢 **Enable/disable** the cron service
+- 📅 **Configure** frequency (daily/weekly/monthly)
+- 🕐 **Choose hour and day**
+- 🗑 **Remove** the schedule
 
-**File installati**:
+**Installed files**:
 - `/usr/local/bin/pulizia_ubuntu_cron.sh` — script
-- `/etc/cron.d/pulizia-ubuntu` — voce cron
-- `/var/log/pulizia_ubuntu.log` — log esecuzioni
+- `/etc/cron.d/pulizia-ubuntu` — cron entry
+- `/var/log/pulizia_ubuntu.log` — execution log
 
 ---
 
-## 📊 Statistiche
+## 📊 Statistics
 
-Le statistiche sono salvate in:
+Statistics are saved in:
 ```
 ~/.local/share/pulizia-ubuntu/stats.json
 ```
 
-Il grafico mostra l'andamento dello spazio liberato nel tempo (ultime 20 pulizie).
+The chart shows the trend of freed space over time (last 20 cleanups).
 
 ---
 
-## 🔐 Shred (cancellazione sicura)
+## 🔐 Shred (secure deletion)
 
-Lo strumento Shred permette di cancellare **irreversibilmente** file o directory:
+The Shred tool allows you to **irreversibly** delete files or directories:
 
-- **Passaggi configurabili**: 1-35 (default 3)
-- **Passaggio zero**: aggiunge zeri finali per nascondere shred
-- **Rimozione automatica**: elimina i file dopo sovrascrittura
-- **Conferma esplicita**: richiede conferma prima di procedere
+- **Configurable passes**: 1-35 (default 3)
+- **Zero pass**: adds final zeros to hide shred
+- **Automatic removal**: deletes files after overwrite
+- **Explicit confirmation**: requires confirmation before proceeding
 
-> ⚠️ **Attenzione**: operazione **irreversibile**.
+> ⚠️ **Warning**: **irreversible** operation.
 > 
-> Non garantito al 100% su SSD (usare cifratura disco LUKS per sicurezza massima).
+> Not guaranteed on SSD (use LUKS disk encryption for maximum security).
 
 ---
 
-## 🌍 Lingue
+## 🌍 Languages
 
-Cambia lingua dal menu in alto a destra. Supportate:
-- 🇮🇹 Italiano
+Change language from the top-right menu. Supported:
+- 🇮🇹 Italian
 - 🇬🇧 English
 
-La lingua viene anche rilevata automaticamente dall'ambiente (`LANG`).
+Language is also auto-detected from the environment (`LANG`).
 
 ---
 
-## 🤝 Contribuire
+## 🤝 Contributing
 
-Vedi [CONTRIBUTING.md](CONTRIBUTING.md) per le linee guida.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
 ## 📝 Changelog
 
-Vedi [CHANGELOG.md](CHANGELOG.md) per la storia delle versioni.
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ### v5.0 (2026-10-05)
-- 💻 Pulizia cache sviluppatori (pip, npm, yarn, cargo, gem, composer, go)
-- 🎬 Pulizia cache multimedia (Thunderbird, Spotify, VLC, ...)
-- 🎮 Pulizia cache Steam
-- 🔗 Rimozione link simbolici rotti
-- 🗂 Rimozione cartelle vuote
+- 💻 Developer cache cleanup (pip, npm, yarn, cargo, gem, composer, go)
+- 🎬 Multimedia cache cleanup (Thunderbird, Spotify, VLC, ...)
+- 🎮 Steam cache cleanup
+- 🔗 Remove broken symlinks
+- 🗂 Remove empty directories
 
 ### v4.2 (2026-10-01)
-- GUI compatta, report solo nella finestra finale
-- Menu Strumenti a tendina
-- Gruppi opzioni collassabili
+- Compact GUI, report only in final window
+- Tools dropdown menu
+- Collapsible option groups
 
 ### v4.0 (2026-10-01)
-- Riorganizzazione GUI
-- 5 temi (dark, light, nord, dracula, solarized)
+- GUI reorganization
+- 5 themes (dark, light, nord, dracula, solarized)
 
 ### v3.0 (2026-10-01)
-- Flatpak, Docker, TRIM SSD
+- Flatpak, Docker, SSD TRIM
 - Shred (v3.1)
 
 ### v2.0 (2026-09-25)
-- i18n IT/EN, grafico disco, icona personalizzata
+- IT/EN i18n, disk chart, custom icon
 
 ### v1.0 (2026-09-20)
-- Prima versione con pulizia base
+- First version with basic cleanup
 
 ---
 
-## 📄 Licenza
+## 📄 License
 
-Distribuito sotto licenza **MIT**. Vedi [LICENSE](LICENSE) per i dettagli.
+Distributed under **MIT** license. See [LICENSE](LICENSE) for details.
 
 ---
 
-## 👤 Autore
+## 👤 Author
 
 **coding4u-it**
 
@@ -308,12 +304,12 @@ Distribuito sotto licenza **MIT**. Vedi [LICENSE](LICENSE) per i dettagli.
 
 <div align="center">
 
-**⭐ Se ti piace questo progetto, lascia una stella su GitHub! ⭐**
+**⭐ If you like this project, leave a star on GitHub! ⭐**
 
-[🐛 Segnala un bug](https://github.com/coding4u-it/pulizia-ubuntu/issues/new)
+[🐛 Report a bug](https://github.com/coding4u-it/pulizia-ubuntu/issues/new)
 ·
-[💡 Proponi una funzionalità](https://github.com/coding4u-it/pulizia-ubuntu/issues/new)
+[💡 Request a feature](https://github.com/coding4u-it/pulizia-ubuntu/issues/new)
 ·
-[📥 Scarica l'ultima release](https://github.com/coding4u-it/pulizia-ubuntu/releases/latest)
+[📥 Download the latest release](https://github.com/coding4u-it/pulizia-ubuntu/releases/latest)
 
 </div>
